@@ -224,6 +224,15 @@ object Terminal
         out.flush()?
         Ok(t)
 
+    // Opens the terminal, runs `body` with it, and closes it when `body` returns, answering what
+    // `body` answered. The terminal is put back on every return; a trap inside `body` leaves it as it
+    // was, since nothing runs after a trap.
+    use[T](options: Options = Options(), body: (Terminal) -> T) -> Result[T, IoError]
+        val t = open(options)?
+        val result = body(t)
+        t.close()
+        Ok(result)
+
 // A watch of `sig`, which every platform this runs on has.
 private watchOrFail(sig: int) -> Watch = signal.watch(sig) match
     Ok(w) -> w
