@@ -1,0 +1,230 @@
+module dev.avinlang.tui
+
+// The terminal itself: raw mode, the alternate screen, the window's size, input as events, and frames
+// drawn by difference. Everything here but six calls into Sysl's library is Avin: whether a
+// descriptor is a terminal, its size, raw mode on and off, waiting for input with a time limit, and
+// reading it.
+
+import avin.fs
+import avin.fs.File
+import avin.io.IoError
+import avin.process
+import avin.signal
+import avin.signal.Watch
+import avin.time
+import avin.time.Duration
+
+// The Sysl side.
+
+@sysl("sysl.tty.raw")
+private enterRaw() -> bool
+
+@sysl("sysl.tty.cooked")
+private leaveRaw()
+
+@sysl("sysl.posix.tty.is_tty")
+private isTerminal(fd: int) -> bool
+
+@sysl("sysl.posix.tty.WindowSize")
+private data WindowSize(rows: int, cols: int)
+
+@sysl("sysl.posix.tty.window_size")
+private windowSize(fd: int) -> Option[WindowSize]
+
+@sysl("sysl.io.wait.Interest")
+private data Interest
+    Readable
+    Writable
+
+@sysl("sysl.time.Duration")
+private data WaitTime(us: long)
+
+@sysl("sysl.fs.IoError")
+private data SyslError
+    NotFound
+    PermissionDenied
+    AlreadyExists
+    NotADirectory
+    IsADirectory
+    DirectoryNotEmpty
+    TooManyOpenFiles
+    NoSpaceLeft
+    Interrupted
+    NotOpen
+    NotPermitted
+    InvalidUtf8(offset: long)
+    Other(code: int)
+
+@sysl("sysl.io.wait.ready", blocking)
+private ready(fd: int, interest: Interest, timeout: WaitTime) -> Result[bool, SyslError]
+
+@sysl("sysl.io.FdReader")
+private class FdReader
+    @sysl(blocking)
+    read(into: Array[byte]) -> Array[byte]
+
+@sysl("sysl.io.fd_reader")
+private fdReader(fd: int) -> FdReader
+
+private val InputFd: int = 0
+
+// How long the rest of an escape sequence may take to follow its escape byte before the escape is
+// taken as the Escape key.
+private val EscapeDelay: avin.time.Duration = time.millis(25)
+
+// The longest a wait for input goes without looking at the signals.
+private val SignalSlice: avin.time.Duration = time.millis(50)
+
+// What a terminal is opened with.
+data Options(
+    // Report the mouse: presses, releases, drags and the wheel.
+    mouse: bool = true,
+    // Bracket pasted text, so a paste arrives as one `Paste` event rather than as keys.
+    paste: bool = true,
+    // The colours to draw in; `None` asks the environment (`detectColorMode`).
+    colors: Option[ColorMode] = None)
+
+// What a terminal is put back into on the way out, written in one piece.
+private leaveSequence(o: Options) -> string
+    val out = StringWriter()
+    if o.mouse then out.write("\u{1b}[?1006l\u{1b}[?1002l\u{1b}[?1000l")
+    if o.paste then out.write("\u{1b}[?2004l")
+    out.write("\u{1b}[0m\u{1b}[?25h\u{1b}[?1049l")
+    out.text()
+
+// What a terminal is set into on the way in: the alternate screen, cleared, the cursor hidden, and
+// the mouse and bracketed paste where asked for.
+private enterSequence(o: Options) -> string
+    val out = StringWriter()
+    out.write("\u{1b}[?1049h\u{1b}[?25l")
+    if o.paste then out.write("\u{1b}[?2004h")
+    if o.mouse then out.write("\u{1b}[?1000h\u{1b}[?1002h\u{1b}[?1006h")
+    out.text()
+
+// The colours a terminal shows, as its environment says: `COLORTERM` of `truecolor` or `24bit` is any
+// colour, a `TERM` naming `256color` is the palette, and anything else the sixteen. `NO_COLOR` does
+// not change it: a full-screen program's colours are part of what it draws.
+detectColorMode(colorTerm: Option[string], term: Option[string]) -> ColorMode
+    val ct = colorTerm.getOrElse("").toLowerCase()
+    if ct == "truecolor" || ct == "24bit" then return TrueColor
+    if term.getOrElse("").contains("256color") then Palette256 else Basic16
+
+// A terminal held in raw mode on the alternate screen, from `open` until `close`.
+//
+//     val term = Terminal.open()?
+//     loop
+//         val g = term.frame()
+//         g.text(0, 0, "press q")
+//         term.present(g)?
+//         term.poll(time.seconds(1)) match
+//             Some(KeyPress(Char('q'), _)) -> break
+//             _ -> ()
+//     term.close()
+//
+// Keys arrive with Ctrl-C as a key like any other, raw mode having turned the terminal's signals off,
+// so a program decides what Ctrl-C does. A `Terminate`, `Hangup` or `Interrupt` sent from outside
+// arrives as a `Stop` event, and so does the end of the input.
+class Terminal(private val out: File, val options: Options, val colorMode: ColorMode)
+    private val reader = fdReader(InputFd)
+    private val decoder = Decoder()
+    private val renderer = Renderer(colorMode)
+    private val resized: Watch = watchOrFail(signal.WindowChange)
+    private val stops: Vector[Watch] = [watchOrFail(signal.Terminate), watchOrFail(signal.Hangup),
+                                         watchOrFail(signal.Interrupt)]
+    private var cols = 80
+    private var rows = 24
+    private var open = true
+    private val chunk: Array[byte] = Array.fill(4096, byte(0))
+
+    // The terminal's width and height in cells, as of the last resize.
+    width() -> int = cols
+    height() -> int = rows
+
+    // A blank grid the size of the terminal, to draw the next frame into.
+    frame() -> Grid = Grid(cols, rows)
+
+    // Draws `g` by difference from the last frame, in one write.
+    present(g: Grid) -> Result[unit, IoError]
+        val bytes = renderer.render(g)
+        if bytes.isEmpty() then return Ok(())
+        out.writeText(bytes)?
+        out.flush()
+
+    // Makes the next `present` redraw everything.
+    redraw() = renderer.invalidate()
+
+    // The next event, waiting at most `timeout` for one: `None` when none came in time. A resize is
+    // answered as `Resize` once the terminal has been asked its new size.
+    poll(timeout: avin.time.Duration) -> Option[Event]
+        val until = time.monotonic() + timeout
+        loop
+            decoder.next() match
+                Some(e) -> return Some(e)
+                None -> ()
+            if resized.take()
+                measure()
+                return Some(Resize(cols, rows))
+            for w in stops
+                if w.take() then return Some(Stop(w.signal()))
+            if decoder.hasPending()
+                // Part of a sequence: the rest follows at once or not at all.
+                if !waitAndRead(EscapeDelay)
+                    decoder.flush() match
+                        Some(e) -> return Some(e)
+                        None -> ()
+                continue
+            val left = until - time.monotonic()
+            if left.micros <= 0 then return None
+            if !waitAndRead(if left < SignalSlice then left else SignalSlice) then continue
+            if !open then return Some(Stop(signal.Hangup))
+
+    // Leaves the alternate screen, shows the cursor, turns the mouse and bracketed paste off, and puts
+    // the terminal back into the mode it was in. Closing a closed terminal does nothing.
+    close()
+        if !open then return
+        open = false
+        out.writeText(leaveSequence(options))
+        out.flush()
+        out.close()
+        leaveRaw()
+
+    // Asks the terminal its size.
+    private measure()
+        windowSize(InputFd) match
+            Some(s) ->
+                cols = s.cols
+                rows = s.rows
+            None -> ()
+
+    // Waits at most `limit` for input and reads what there is, answering whether anything arrived.
+    // The end of the input marks the terminal closed.
+    private waitAndRead(limit: avin.time.Duration) -> bool
+        ready(InputFd, Readable, WaitTime(limit.micros)) match
+            Ok(true) -> ()
+            _ -> return false
+        val got = reader.read(chunk)
+        if got.length() == 0
+            open = false
+            return true
+        decoder.feed(got)
+        true
+
+object Terminal
+    // Puts the terminal on standard input into raw mode and onto the alternate screen, and answers it.
+    // Fails where standard input is not a terminal, or `/dev/tty`, the terminal the program is drawn
+    // on, cannot be opened.
+    open(options: Options = Options()) -> Result[Terminal, IoError]
+        if !isTerminal(InputFd) then return Err(IoError.Other("standard input is not a terminal"))
+        val out = fs.openUpdate("/dev/tty")?
+        if !enterRaw() then return Err(IoError.Other("the terminal cannot be put into raw mode"))
+        val mode = options.colors.getOrElse(detectColorMode(process.env("COLORTERM"), process.env("TERM")))
+        val t = Terminal(out, options, mode)
+        t.measure()
+        out.writeText(enterSequence(options))?
+        out.flush()?
+        Ok(t)
+
+// A watch of `sig`, which every platform this runs on has.
+private watchOrFail(sig: int) -> Watch = signal.watch(sig) match
+    Ok(w) -> w
+    Err(e) -> fail(s"watching signal $sig: ${e.message()}")

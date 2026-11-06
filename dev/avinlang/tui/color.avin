@@ -21,34 +21,40 @@ private val cubeLevels: Array[int] = [0, 95, 135, 175, 215, 255]
 
 // The colour `c` as the terminal in `mode` can show it: unchanged where it can, the nearest otherwise.
 // `Default` and the basic colours are shown by every terminal.
-reduce(c: Color, mode: ColorMode) -> Color = (c, mode) match
-    (Default, _) -> c
-    (Basic(_), _) -> c
-    (_, TrueColor) -> c
-    (Indexed(_), Palette256) -> c
-    (Rgb(r, g, b), Palette256) -> Indexed(nearest256(r, g, b))
-    (Indexed(n), Basic16) ->
-        val rgb = indexedRgb(n)
-        if n < 16 then Basic(n) else Basic(nearest16(rgb >> 16, (rgb >> 8) & 0xff, rgb & 0xff))
-    (Rgb(r, g, b), Basic16) -> Basic(nearest16(r, g, b))
+reduce(c: Color, mode: ColorMode) -> Color
+reduce(Default, _) = Default
+reduce(Basic(n), _) = Basic(n)
+reduce(c, TrueColor) = c
+reduce(Indexed(n), Palette256) = Indexed(n)
+reduce(Rgb(r, g, b), Palette256) = Indexed(nearest256(r, g, b))
+reduce(Indexed(n < 16), Basic16) = Basic(n)
+reduce(Indexed(n), Basic16) =
+    val rgb = indexedRgb(n)
+    Basic(nearest16(rgb >> 16, (rgb >> 8) & 0xff, rgb & 0xff))
+reduce(Rgb(r, g, b), Basic16) = Basic(nearest16(r, g, b))
 
 // The red, green and blue, packed as `0xrrggbb`, of the palette's colour `n`.
-indexedRgb(n: int) -> int = n match
-    0..15 -> basicRgb(n)
-    16..231 ->
-        val k = n - 16
-        (cubeLevels(k / 36) << 16) | (cubeLevels((k / 6) % 6) << 8) | cubeLevels(k % 6)
-    _ ->
-        val v = 8 + 10 * (n - 232)
-        (v << 16) | (v << 8) | v
+indexedRgb(n: int) -> int
+indexedRgb(n < 16) = basicRgb(n)
+indexedRgb(n < 232) =
+    val k = n - 16
+    (cubeLevels(k / 36) << 16) | (cubeLevels((k / 6) % 6) << 8) | cubeLevels(k % 6)
+indexedRgb(n) =
+    val v = 8 + 10 * (n - 232)
+    (v << 16) | (v << 8) | v
 
 // The palette's colour nearest to `r`, `g`, `b`, among the cube and the greys: the cube's colour of
 // each channel's nearest level, or the nearest grey where that is closer.
 nearest256(r: int, g: int, b: int) -> int
     val cube = 16 + 36 * cubeIndex(r) + 6 * cubeIndex(g) + cubeIndex(b)
-    val average = (r + g + b) / 3
-    val grey = if average < 8 then 232 else if average > 238 then 255 else 232 + (average - 8 + 5) / 10
+    val grey = greyIndex((r + g + b) / 3)
     if distance(indexedRgb(grey), r, g, b) < distance(indexedRgb(cube), r, g, b) then grey else cube
+
+// The palette's grey nearest to the level `v`.
+private greyIndex(v: int) -> int
+greyIndex(v < 8) = 232
+greyIndex(v > 238) = 255
+greyIndex(v) = 232 + (v - 8 + 5) / 10
 
 // The basic colour nearest to `r`, `g`, `b`.
 nearest16(r: int, g: int, b: int) -> int
@@ -62,10 +68,10 @@ nearest16(r: int, g: int, b: int) -> int
     best
 
 // The cube level nearest to `v`.
-private cubeIndex(v: int) -> int = v match
-    0..47 -> 0
-    48..114 -> 1
-    _ -> (v - 35) / 40
+private cubeIndex(v: int) -> int
+cubeIndex(v < 48) = 0
+cubeIndex(v < 115) = 1
+cubeIndex(v) = (v - 35) / 40
 
 // The squared distance between a packed colour and `r`, `g`, `b`.
 private distance(rgb: int, r: int, g: int, b: int) -> int

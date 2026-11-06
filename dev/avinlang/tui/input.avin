@@ -311,28 +311,32 @@ class Decoder()
 // What a mouse report's button number `b` and final byte say the mouse did: 64 and up are the wheel,
 // 32 is motion, and otherwise `M` presses and `m` releases.
 private mouseAction(b: int, fin: char) -> MouseAction
-    val low = b & 3
-    if (b & 64) != 0
-        return low match
-            0 -> ScrollUp
-            1 -> ScrollDown
-            2 -> ScrollLeft
-            _ -> ScrollRight
-    if (b & 32) != 0 then return if low == 3 then Move else Drag
-    if fin == 'm' then Release else Press
+mouseAction(b, _)
+    | (b & 64) != 0 = wheel(b & 3)
+    | (b & 32) != 0 && (b & 3) == 3 = Move
+    | (b & 32) != 0 = Drag
+mouseAction(_, 'm') = Release
+mouseAction(_, _) = Press
+
+// The way the wheel turned, by the low bits of a wheel report.
+private wheel(low: int) -> MouseAction
+wheel(0) = ScrollUp
+wheel(1) = ScrollDown
+wheel(2) = ScrollLeft
+wheel(_) = ScrollRight
 
 // The key a `~` sequence's first parameter names.
-private tilde(n: int) -> Option[Key] = n match
-    1 | 7 -> Some(Home)
-    2 -> Some(Insert)
-    3 -> Some(Delete)
-    4 | 8 -> Some(End)
-    5 -> Some(PageUp)
-    6 -> Some(PageDown)
-    11..15 -> Some(F(n - 10))
-    17..21 -> Some(F(n - 11))
-    23 | 24 -> Some(F(n - 12))
-    _ -> None
+private tilde(n: int) -> Option[Key]
+tilde(1 | 7) = Some(Home)
+tilde(2) = Some(Insert)
+tilde(3) = Some(Delete)
+tilde(4 | 8) = Some(End)
+tilde(5) = Some(PageUp)
+tilde(6) = Some(PageDown)
+tilde(n @ 11..15) = Some(F(n - 10))
+tilde(n @ 17..21) = Some(F(n - 11))
+tilde(n @ 23..24) = Some(F(n - 12))
+tilde(_) = None
 
 // The modifiers a sequence's second parameter gives, one more than the bits of `Shift`, `Alt` and
 // `Ctrl`; none where there is no second parameter.

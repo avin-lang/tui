@@ -50,13 +50,16 @@ private addAttributes(p: Buffer[string], attrs: int)
 
 // The SGR parameters that set a colour as the foreground, or with `background` the background.
 colorParams(c: Color, background: bool) -> string
-    val base = if background then 40 else 30
-    c match
-        Default -> s"${base + 9}"
-        Basic(n @ 0..7) -> s"${base + n}"
-        Basic(n) -> s"${base + 60 + n - 8}"
-        Indexed(n) -> s"${base + 8};5;$n"
-        Rgb(r, g, b) -> s"${base + 8};2;$r;$g;$b"
+colorParams(Default, bg) = s"${plane(bg) + 9}"
+colorParams(Basic(n < 8), bg) = s"${plane(bg) + n}"
+colorParams(Basic(n), bg) = s"${plane(bg) + 60 + n - 8}"
+colorParams(Indexed(n), bg) = s"${plane(bg) + 8};5;$n"
+colorParams(Rgb(r, g, b), bg) = s"${plane(bg) + 8};2;$r;$g;$b"
+
+// The first SGR code of the foreground's colours, or with `background` the background's.
+private plane(background: bool) -> int
+plane(true) = 40
+plane(false) = 30
 
 private joined(p: Buffer[string]) -> string
     val out = StringWriter()

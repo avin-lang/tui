@@ -34,11 +34,11 @@ data Border
     Heavy
 
 // The six characters of a border: the two edges and the four corners, top left first, clockwise.
-private borderChars(b: Border) -> string = b match
-    Single -> "─│┌┐┘└"
-    Double -> "═║╔╗╝╚"
-    Rounded -> "─│╭╮╯╰"
-    Heavy -> "━┃┏┓┛┗"
+private borderChars(b: Border) -> string
+borderChars(Single) = "─│┌┐┘└"
+borderChars(Double) = "═║╔╗╝╚"
+borderChars(Rounded) = "─│╭╮╯╰"
+borderChars(Heavy) = "━┃┏┓┛┗"
 
 // The blocks a meter's last cell is drawn with, an eighth of a cell more each.
 private val eighths: string = " ▏▎▍▌▋▊▉█"
