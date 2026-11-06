@@ -1,0 +1,359 @@
+module tui
+
+// A key, without the modifiers held with it.
+data Key
+    // A character typed: a letter, a digit, a symbol, a space, any character of any script. With
+    // `Ctrl` it is the lowercase letter or the symbol the control byte stands for: Ctrl-A is
+    // `Char('a')` with `Ctrl`.
+    Char(c: char)
+    Enter
+    Tab
+    BackTab
+    Backspace
+    Escape
+    Up
+    Down
+    Left
+    Right
+    Home
+    End
+    PageUp
+    PageDown
+    Insert
+    Delete
+    // A function key, F1 to F12 (and beyond, where the terminal sends them).
+    F(n: int)
+
+// The modifiers held with a key or a mouse event, a set of bits.
+val Shift: int = 1
+val Alt: int = 2
+val Ctrl: int = 4
+
+// What a mouse did.
+data MouseAction
+    Press
+    Release
+    // Moved with a button held.
+    Drag
+    // Moved with no button held, where the terminal reports it.
+    Move
+    ScrollUp
+    ScrollDown
+    ScrollLeft
+    ScrollRight
+
+// The button of a mouse event: 0 left, 1 middle, 2 right, -1 none (a move, a release where the
+// terminal does not say which, a wheel).
+data MouseEvent(action: MouseAction, button: int, x: int, y: int, mods: int)
+
+// What arrives from the terminal.
+data Event
+    // A key pressed, with the modifiers held.
+    KeyPress(key: Key, mods: int)
+    Mouse(event: MouseEvent)
+    // Text pasted while bracketed paste is on, whole, as one event.
+    Paste(text: string)
+    // The terminal is now `cols` columns by `rows` rows.
+    Resize(cols: int, rows: int)
+    // A signal asking the program to stop arrived: `Terminate`, `Hangup` or `Interrupt` of
+    // `avin.signal`. The program should leave the terminal and end.
+    Stop(signal: int)
+
+private val EscByte: int = 0x1b
+
+// What a parse of the pending bytes found at their start.
+private data Parsed
+    // An event, and how many bytes it took.
+    Found(event: Event, used: int)
+    // Bytes that mean nothing, to be dropped: an escape sequence the decoder does not know.
+    Skip(used: int)
+    // The start of something more bytes may complete.
+    Partial
+
+// Turns the bytes a terminal sends into events. Bytes are given with `feed` as they are read, in
+// pieces of any size; `next` answers each event once its bytes have all arrived. A sequence cut
+// between two reads waits for the rest.
+//
+// An escape byte alone is the Escape key or the start of a sequence, and only time tells them apart:
+// a terminal sends a sequence's bytes together, so where nothing follows the escape soon, the reader
+// calls `flush`, and what is pending is taken as it stands. A lone escape is Escape; an escape before
+// a key is that key with `Alt`; a sequence cut short becomes Escape and the keys of its bytes.
+// Bracketed paste is the exception: it waits for its end however long it takes.
+class Decoder()
+    // The bytes not yet taken are those of `pending` from `start` on.
+    private val pending = Buffer[byte]()
+    private var start = 0
+    private var pasting = false
+    private val paste = Buffer[byte]()
+
+    // Adds bytes read from the terminal.
+    feed(bytes: Array[byte])
+        pending.appendAll(bytes)
+
+    // Adds the bytes of `text`; for tests.
+    feedText(text: string)
+        pending.appendAll(text.bytes())
+
+    // Whether bytes are waiting that do not yet make an event.
+    hasPending() -> bool = length() > 0 || pasting
+
+    // The next event the bytes fed so far make, if they make one.
+    next() -> Option[Event]
+        loop
+            if pasting then return pasteStep()
+            if length() == 0 then return None
+            parse(0, false) match
+                Found(e, used) ->
+                    drop(used)
+                    return Some(e)
+                Skip(used) -> drop(used)
+                Partial -> return None
+
+    // Takes what is pending as it stands, nothing more being on its way: the next event of it, as
+    // `next` answers, but with a sequence cut short read as the keys of its bytes. A paste in
+    // progress keeps waiting.
+    flush() -> Option[Event]
+        if pasting then return pasteStep()
+        if length() == 0 then return None
+        parse(0, true) match
+            Found(e, used) ->
+                drop(used)
+                Some(e)
+            Skip(used) ->
+                drop(used)
+                flush()
+            Partial -> None
+
+    // Every event the bytes fed so far make, flushing at the end; for tests.
+    drain() -> Vector[Event]
+        val out = Vector.newBuilder[Event]()
+        loop
+            next() match
+                Some(e) -> out.addOne(e)
+                None -> flush() match
+                    Some(e) -> out.addOne(e)
+                    None -> return out.result()
+
+    // Takes the first `n` bytes not yet taken.
+    private drop(n: int)
+        start += n
+        if start >= pending.length()
+            pending.clear()
+            start = 0
+
+    // How many bytes are not yet taken.
+    private length() -> int = pending.length() - start
+
+    // The byte `i` places after the first not yet taken.
+    private at(i: int) -> int = int(pending(start + i))
+
+    // Collects pasted bytes until the sequence that ends the paste.
+    private pasteStep() -> Option[Event]
+        val end = "\u{1b}[201~".bytes()
+        while length() > 0
+            paste.append(pending(start))
+            drop(1)
+            if endsWith(paste, end)
+                var i = 0
+                while i < end.length()
+                    paste.remove(paste.length() - 1)
+                    i += 1
+                val text = string.fromUtf8Lossy(paste.toArray())
+                paste.clear()
+                pasting = false
+                return Some(Paste(text))
+        None
+
+    // What the bytes from `i` start with; with `final` nothing more is coming.
+    private parse(i: int, final: bool) -> Parsed
+        val b = at(i)
+        if b != EscByte then return plain(i, 0)
+        if i + 1 >= length() then return if final then Found(KeyPress(Escape, 0), 1) else Partial
+        val c = at(i + 1)
+        if c == int('[') || c == int('O')
+            val seq = if c == int('[') then csi(i) else ss3(i)
+            if !final || seq != Partial then return seq
+            // Cut short: escape and the bracket alone are Alt-[ (or Alt-O); longer, the escape is
+            // Escape and the bytes after it are read again as keys.
+            return if i + 2 >= length() then Found(KeyPress(Char(char(c)), Alt), 2) else Found(KeyPress(Escape, 0), 1)
+        if c == EscByte
+            // Escape before a sequence is that sequence with Alt; before nothing, Alt-Escape.
+            if i + 2 >= length() then return if final then Found(KeyPress(Escape, Alt), 2) else Partial
+            val d = at(i + 2)
+            if d != int('[') && d != int('O') then return Found(KeyPress(Escape, Alt), 2)
+            return parse(i + 1, final) match
+                Found(KeyPress(k, m), used) if used > 2 -> Found(KeyPress(k, m | Alt), used + 1)
+                Partial -> Partial
+                _ -> Found(KeyPress(Escape, Alt), 2)
+        plain(i + 1, Alt) match
+            Found(KeyPress(k, m), used) -> Found(KeyPress(k, m | Alt), used + 1)
+            Found(e, used) -> Found(e, used + 1)
+            Skip(used) -> Skip(used + 1)
+            Partial -> if final then Found(KeyPress(Escape, 0), 1) else Partial
+
+    // A key that is not an escape sequence, at `i`: a control byte or a UTF-8 character.
+    private plain(i: int, mods: int) -> Parsed
+        val b = at(i)
+        b match
+            0x0d | 0x0a -> Found(KeyPress(Enter, mods), 1)
+            0x09 -> Found(KeyPress(Tab, mods), 1)
+            0x7f -> Found(KeyPress(Backspace, mods), 1)
+            0x00 -> Found(KeyPress(Char(' '), mods | Ctrl), 1)
+            0x01..0x1a -> Found(KeyPress(Char(char(b - 1 + int('a'))), mods | Ctrl), 1)
+            0x1c..0x1f -> Found(KeyPress(Char(char(b - 0x1c + int('4'))), mods | Ctrl), 1)
+            0x20..0x7e -> Found(KeyPress(Char(char(b)), mods), 1)
+            _ -> utf8(i, mods)
+
+    // A character of two to four bytes at `i`; a byte that starts none, or a sequence broken off, is
+    // U+FFFD for that byte.
+    private utf8(i: int, mods: int) -> Parsed
+        val b = at(i)
+        val (size, first) =
+            if 0xc2 <= b <= 0xdf then (2, b & 0x1f)
+            else if 0xe0 <= b <= 0xef then (3, b & 0x0f)
+            else if 0xf0 <= b <= 0xf4 then (4, b & 0x07)
+            else (0, 0)
+        if size == 0 then return Found(KeyPress(Char('\u{fffd}'), mods), 1)
+        var n = first
+        var k = 1
+        while k < size
+            if i + k >= length() then return Partial
+            val c = at(i + k)
+            if (c & 0xc0) != 0x80 then return Found(KeyPress(Char('\u{fffd}'), mods), k)
+            n = (n << 6) | (c & 0x3f)
+            k += 1
+        val least = if size == 2 then 0x80 else if size == 3 then 0x800 else 0x10000
+        if n < least || 0xd800 <= n <= 0xdfff || n > 0x10ffff
+            return Found(KeyPress(Char('\u{fffd}'), mods), size)
+        Found(KeyPress(Char(char(n)), mods), size)
+
+    // An SS3 sequence at `i`: escape, `O`, and one final byte.
+    private ss3(i: int) -> Parsed
+        if i + 2 >= length() then return Partial
+        val key = char(at(i + 2)) match
+            'A' -> Some(Up)
+            'B' -> Some(Down)
+            'C' -> Some(Right)
+            'D' -> Some(Left)
+            'H' -> Some(Home)
+            'F' -> Some(End)
+            'P' -> Some(F(1))
+            'Q' -> Some(F(2))
+            'R' -> Some(F(3))
+            'S' -> Some(F(4))
+            'M' -> Some(Enter)
+            _ -> None
+        key match
+            Some(k) -> Found(KeyPress(k, 0), 3)
+            None -> Skip(3)
+
+    // A CSI sequence at `i`: escape, `[`, parameter bytes, intermediate bytes and a final byte.
+    private csi(i: int) -> Parsed
+        var j = i + 2
+        while j < length() && 0x30 <= at(j) <= 0x3f
+            j += 1
+        while j < length() && 0x20 <= at(j) <= 0x2f
+            j += 1
+        if j >= length() then return Partial
+        val fin = at(j)
+        val used = j + 1 - i
+        if !(0x40 <= fin <= 0x7e) then return Skip(used - 1)
+        val paramText = StringWriter()
+        for k in i + 2 ..< j
+            paramText.write(char(at(k)).toString())
+        val text = paramText.text()
+        if text.startsWith("<") then return mouse(text.drop(1), char(fin), used)
+        val params = numbers(text)
+        val mods = modifiers(params)
+        val key: Option[Key] = char(fin) match
+            'A' -> Some(Up)
+            'B' -> Some(Down)
+            'C' -> Some(Right)
+            'D' -> Some(Left)
+            'H' -> Some(Home)
+            'F' -> Some(End)
+            'Z' -> Some(BackTab)
+            'P' -> Some(F(1))
+            'Q' -> Some(F(2))
+            'R' -> Some(F(3))
+            'S' -> Some(F(4))
+            '~' -> tilde(if params.isEmpty() then -1 else params(0))
+            _ -> None
+        if char(fin) == '~' && params.nonEmpty() && params(0) == 200
+            pasting = true
+            return Skip(used)
+        key match
+            Some(BackTab) -> Found(KeyPress(BackTab, mods | Shift), used)
+            Some(k) -> Found(KeyPress(k, mods), used)
+            None -> Skip(used)
+
+    // An SGR mouse report, `<b;x;y` and `M` for a press or `m` for a release.
+    private mouse(text: string, fin: char, used: int) -> Parsed
+        val p = numbers(text)
+        if p.length() != 3 || (fin != 'M' && fin != 'm') then return Skip(used)
+        val b = p(0)
+        val x = p(1) - 1
+        val y = p(2) - 1
+        if x < 0 || y < 0 then return Skip(used)
+        var mods = 0
+        if (b & 4) != 0 then mods = mods | Shift
+        if (b & 8) != 0 then mods = mods | Alt
+        if (b & 16) != 0 then mods = mods | Ctrl
+        val low = b & 3
+        val action = mouseAction(b, fin)
+        val button = if (b & 64) != 0 || low == 3 then -1 else low
+        Found(Mouse(MouseEvent(action, button, x, y, mods)), used)
+
+// What a mouse report's button number `b` and final byte say the mouse did: 64 and up are the wheel,
+// 32 is motion, and otherwise `M` presses and `m` releases.
+private mouseAction(b: int, fin: char) -> MouseAction
+    val low = b & 3
+    if (b & 64) != 0
+        return low match
+            0 -> ScrollUp
+            1 -> ScrollDown
+            2 -> ScrollLeft
+            _ -> ScrollRight
+    if (b & 32) != 0 then return if low == 3 then Move else Drag
+    if fin == 'm' then Release else Press
+
+// The key a `~` sequence's first parameter names.
+private tilde(n: int) -> Option[Key] = n match
+    1 | 7 -> Some(Home)
+    2 -> Some(Insert)
+    3 -> Some(Delete)
+    4 | 8 -> Some(End)
+    5 -> Some(PageUp)
+    6 -> Some(PageDown)
+    11..15 -> Some(F(n - 10))
+    17..21 -> Some(F(n - 11))
+    23 | 24 -> Some(F(n - 12))
+    _ -> None
+
+// The modifiers a sequence's second parameter gives, one more than the bits of `Shift`, `Alt` and
+// `Ctrl`; none where there is no second parameter.
+private modifiers(params: Vector[int]) -> int =
+    if params.length() < 2 || params(1) < 1 then 0 else (params(1) - 1) & (Shift | Alt | Ctrl)
+
+// The numbers of a parameter string, separated by `;`; an empty one is 0, and a part that is not a
+// number ends them.
+private numbers(text: string) -> Vector[int]
+    val out = Vector.newBuilder[int]()
+    if text.isEmpty() then return out.result()
+    for part in text.split(";")
+        var n = 0
+        for c in part.chars()
+            if !('0' <= c <= '9') then return out.result()
+            n = n *| 10 +| (int(c) - int('0'))
+        out.addOne(n)
+    out.result()
+
+private endsWith(b: Buffer[byte], suffix: Vector[byte]) -> bool
+    val n = b.length()
+    val m = suffix.length()
+    if n < m then return false
+    var i = 0
+    while i < m
+        if b(n - m + i) != suffix(i) then return false
+        i += 1
+    true
