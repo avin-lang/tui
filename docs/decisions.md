@@ -129,7 +129,7 @@ restores nothing.
 
 ## `examples/top` reads the system through commands, behind a `Source` trait
 
-**Proposed** (branch `htop-demo`). The example runs `sysctl hw.ncpu vm.loadavg kern.boottime
+**Settled on the user's delegation 2026-11-06** (branch `htop-demo`). The example runs `sysctl hw.ncpu vm.loadavg kern.boottime
 hw.memsize vm.swapusage`, `vm_stat` and `ps -axo pid=,ppid=,user=,pcpu=,pmem=,rss=,time=,utime=,state=,comm=`
 at every look (every 1.5 s, and 0.3 s after the first) and parses what they print. Everything else
 sees only `Sample`s from a `Source`.
