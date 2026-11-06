@@ -1,0 +1,5 @@
+package { name = "ptyprobe", version = "0.1.0", description = "Opens a Terminal and ends by exit, a trap or a normal close; run in a pty by the tests" }
+
+dependencies {
+  tui { path = "../.." }
+}

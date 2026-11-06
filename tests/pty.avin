@@ -1,0 +1,60 @@
+module tests
+
+// A Terminal opened in a real pseudo-terminal, ended by `exit`, a trap and `close`: the screen and the
+// terminal's mode are put back each way. The probe program in testdata/ptyprobe is built with the
+// compiler named by `AVIN_COMPILER` (default `avin`) and run under `script`, which supplies the pty.
+import avin.fs
+import avin.process
+import avin.process.Command
+
+private val Leave: string = "\u{1b}[?1049l"
+
+// Builds the probe, runs it under a pty with `arg`, then `stty -a` in the same pty; answers everything
+// the pty showed, and the status the probe ended with is in it as `STATUS=<n>`.
+private ptyRun(arg: string) -> string
+    val dir = fs.createTempDir("tui-pty-").getOrElse("")
+    assert(dir != "")
+    val compiler = process.env("AVIN_COMPILER").getOrElse("avin")
+    val source = process.currentDir().getOrElse("") + "/testdata/ptyprobe"
+    val built = Command(compiler, "build", source, "-o", dir + "/probe").output()
+    assert(built.isOk(), "building the probe failed")
+    val script = "(sleep 1) | script -q /dev/null sh -c '\"$PROBE\" $ARG; echo STATUS=$?; stty -a'"
+    val shown = Command("sh", "-c", script).withEnv("PROBE", dir + "/probe").withEnv("ARG", arg).output()
+    fs.removeDirAll(dir)
+    shown.getOrElse("")
+
+@test("a trap with the terminal open leaves the screen after the message and restores the mode")
+trapRestores()
+    val shown = ptyRun("trap")
+    val msg = shown.indexOf("boom")
+    assert(msg >= 0, "the trap message")
+    assert(shown.indexOf("\u{1b}[?1049h") >= 0 && shown.indexOf("\u{1b}[?1049h") < msg, "entered before")
+    assert(shown.lastIndexOf(Leave) > msg, "the restore comes after the trap message")
+    assert(shown.contains("lflags: icanon") && shown.contains(" echo "), "cooked mode again")
+
+@test("exit with the terminal open ends with its status and restores screen and mode")
+exitRestores()
+    val shown = ptyRun("exit")
+    assert(shown.contains("STATUS=3"), "the status of exit(3)")
+    assert(shown.lastIndexOf(Leave) >= 0 && shown.indexOf("STATUS=3") > shown.lastIndexOf(Leave), "restored before the shell")
+    assert(shown.contains("lflags: icanon") && shown.contains(" echo "), "cooked mode again")
+
+@test("closing the terminal restores it, and the exit hook then does nothing more")
+closeRestores()
+    val shown = ptyRun("close")
+    assert(shown.contains("STATUS=0"), "a normal end")
+    assert(shown.indexOf(Leave) == shown.lastIndexOf(Leave), "the leave sequence is written once")
+    assert(shown.contains("lflags: icanon") && shown.contains(" echo "), "cooked mode again")
+
+@test("standard output that is not a terminal is refused")
+redirectedRefused()
+    val dir = fs.createTempDir("tui-pty-").getOrElse("")
+    val compiler = process.env("AVIN_COMPILER").getOrElse("avin")
+    val source = process.currentDir().getOrElse("") + "/testdata/ptyprobe"
+    assert(Command(compiler, "build", source, "-o", dir + "/probe").output().isOk(), "building the probe")
+    val shown = Command("sh", "-c", "(sleep 1) | script -q /dev/null sh -c '\"$PROBE\" close > \"$OUT\"; echo STATUS=$?'").withEnv("PROBE", dir + "/probe").withEnv("OUT", dir + "/out.txt").output().getOrElse("")
+    val written = fs.readText(dir + "/out.txt").getOrElse("")
+    fs.removeDirAll(dir)
+    assert(shown.contains("STATUS=1"), "refused")
+    assert(written.contains("standard output is not a terminal"), "the reason")
+    assert(!written.contains("\u{1b}"), "no escape sequence reached the file")

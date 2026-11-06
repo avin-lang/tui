@@ -1,0 +1,25 @@
+module tests
+
+// The whole program in a real pseudo-terminal: started, sent `q`, and it ends with status 0 and the
+// screen and the terminal's mode put back. Built with the compiler named by `AVIN_COMPILER` (default
+// `avin`) and run under `script`, which supplies the pty.
+import avin.fs
+import avin.process
+import avin.process.{Command, MacOS}
+
+@test("top started in a pty quits on q with status 0 and leaves the terminal as it found it")
+quitsOnQ()
+    if process.os() != MacOS then return
+    val dir = fs.createTempDir("top-pty-").getOrElse("")
+    assert(dir != "")
+    val compiler = process.env("AVIN_COMPILER").getOrElse("avin")
+    val here = process.currentDir().getOrElse("")
+    val source = if fs.exists(here + "/main.avin") then here else here + "/examples/top"
+    assert(Command(compiler, "build", source, "-o", dir + "/top").output().isOk(), "building top")
+    val script = "(sleep 3; printf q; sleep 1) | script -q /dev/null sh -c '\"$TOP\"; echo STATUS=$?; stty -a'"
+    val shown = Command("sh", "-c", script).withEnv("TOP", dir + "/top").output().getOrElse("")
+    fs.removeDirAll(dir)
+    assert(shown.contains("\u{1b}[?1049h"), "it drew on the alternate screen")
+    assert(shown.contains("STATUS=0"), "it ended with status 0")
+    assert(shown.lastIndexOf("\u{1b}[?1049l") > shown.indexOf("\u{1b}[?1049h"), "it left the alternate screen")
+    assert(shown.contains("lflags: icanon") && shown.contains(" echo "), "cooked mode again")

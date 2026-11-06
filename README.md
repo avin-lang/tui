@@ -89,7 +89,10 @@ avin test .
 ```
 
 The renderer is tested byte for byte, the decoder over byte sequences split at every point, and the
-widgets drawn into grids; nothing needs a terminal.
+widgets drawn into grids; nothing needs a terminal. The exception is `tests/pty.avin` (and
+`examples/top/tests/pty.avin`): they build a probe program (`testdata/ptyprobe`) with the compiler
+named by the `AVIN_COMPILER` environment variable (default `avin`) and run it under `script`, which
+gives it a pseudo-terminal, to check that `exit`, a trap and `close` all put the terminal back.
 
 The width table is generated from the Unicode Character Database:
 

@@ -1,0 +1,16 @@
+// Opens a terminal and ends it as the argument says: `exit` calls exit(3), `trap` fails, `close` closes
+// it and returns. Run in a pty by tests/pty.avin.
+import avin.process
+import dev.avinlang.tui.Terminal
+
+main(args: Vector[string]) -> int = Terminal.open() match
+    Ok(term) ->
+        args(0) match
+            "exit" -> process.exit(3)
+            "trap" -> fail("boom")
+            _ ->
+                term.close()
+                0
+    Err(e) ->
+        println(e.message())
+        1
