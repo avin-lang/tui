@@ -1,0 +1,1 @@
+package { name = "widthgen", version = "0.1.0", description = "Writes the width tables of tui from the Unicode Character Database" }

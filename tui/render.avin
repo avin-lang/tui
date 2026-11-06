@@ -1,0 +1,151 @@
+module tui
+
+private val Esc: string = "\u{1b}"
+private val Csi: string = "\u{1b}["
+
+// The escape sequence that takes a terminal drawing in `from` to drawing in `to`, in a terminal that
+// shows `mode`'s colours; empty where the two draw alike. It is the shorter of two forms: the changes
+// alone (turning off only the attributes that go, setting only the colours that change), or a reset
+// followed by everything `to` has. Both are one SGR sequence.
+sgr(from: Style, to: Style, mode: ColorMode) -> string
+    val a = Style(reduce(from.fg, mode), reduce(from.bg, mode), from.attrs & AllAttributes)
+    val b = Style(reduce(to.fg, mode), reduce(to.bg, mode), to.attrs & AllAttributes)
+    if a == b then return ""
+    val changes = changeParams(a, b)
+    val reset = resetParams(b)
+    Csi + (if reset.byteLength() < changes.byteLength() then reset else changes) + "m"
+
+// The parameters that set `to` from scratch, after a reset.
+private resetParams(to: Style) -> string
+    val p = Buffer[string]()
+    p.append("0")
+    addAttributes(p, to.attrs)
+    if to.fg != Default then p.append(colorParams(to.fg, false))
+    if to.bg != Default then p.append(colorParams(to.bg, true))
+    joined(p)
+
+// The parameters that change `from` into `to`, leaving what they share alone.
+private changeParams(from: Style, to: Style) -> string
+    val p = Buffer[string]()
+    val off = from.attrs & ~to.attrs
+    var on = to.attrs & ~from.attrs
+    // One code turns bold and dim off together, so one going takes the other back on if it stays.
+    if (off & (Bold | Dim)) != 0
+        p.append("22")
+        on = on | (to.attrs & (Bold | Dim))
+    if (off & Italic) != 0 then p.append("23")
+    if (off & Underline) != 0 then p.append("24")
+    if (off & Reverse) != 0 then p.append("27")
+    addAttributes(p, on)
+    if from.fg != to.fg then p.append(colorParams(to.fg, false))
+    if from.bg != to.bg then p.append(colorParams(to.bg, true))
+    joined(p)
+
+private addAttributes(p: Buffer[string], attrs: int)
+    if (attrs & Bold) != 0 then p.append("1")
+    if (attrs & Dim) != 0 then p.append("2")
+    if (attrs & Italic) != 0 then p.append("3")
+    if (attrs & Underline) != 0 then p.append("4")
+    if (attrs & Reverse) != 0 then p.append("7")
+
+// The SGR parameters that set a colour as the foreground, or with `background` the background.
+colorParams(c: Color, background: bool) -> string
+    val base = if background then 40 else 30
+    c match
+        Default -> s"${base + 9}"
+        Basic(n @ 0..7) -> s"${base + n}"
+        Basic(n) -> s"${base + 60 + n - 8}"
+        Indexed(n) -> s"${base + 8};5;$n"
+        Rgb(r, g, b) -> s"${base + 8};2;$r;$g;$b"
+
+private joined(p: Buffer[string]) -> string
+    val out = StringWriter()
+    var first = true
+    for s in p
+        if !first then out.write(";")
+        out.write(s)
+        first = false
+    out.text()
+
+// The shortest sequence that moves the cursor from column `fromX` of row `fromY` to column `x` of
+// row `y`; `fromX` of -1 is a position the terminal does not know for certain. Columns and rows are
+// counted from 0.
+cursorMove(fromX: int, fromY: int, x: int, y: int) -> string
+    if fromX == x && fromY == y then return ""
+    val absolute =
+        if x == 0 && y == 0 then Csi + "H"
+        else if x == 0 then Csi + s"${y + 1}H"
+        else Csi + s"${y + 1};${x + 1}H"
+    if fromX < 0 || fromY != y then return absolute
+    val n = if x > fromX then x - fromX else fromX - x
+    val code = if x > fromX then "C" else "D"
+    val relative = if n == 1 then Csi + code else Csi + s"$n$code"
+    if relative.byteLength() < absolute.byteLength() then relative else absolute
+
+// Draws grids on a terminal by difference: each frame is turned into the bytes that change what the
+// terminal shows into the new grid, and nothing else. It remembers what the terminal shows, where its
+// cursor is and which style it is drawing in, so a frame identical to the last is no bytes at all.
+//
+// A frame begins where the last left the terminal and ends with the style reset, so what the program
+// writes between frames, and the shell after it, start from the terminal's own colours.
+class Renderer(val mode: ColorMode)
+    private var front: Option[Grid] = None
+    private var cursorX = -1
+    private var cursorY = -1
+    private var current: Style = Style.plain()
+
+    // Makes the next frame redraw everything, as after the screen was cleared behind the renderer's
+    // back.
+    invalidate()
+        front = None
+
+    // The bytes that change the screen from the last frame into `next`. The first frame, and a frame
+    // of another size than the last, clears the screen and draws every cell that is not blank.
+    render(next: Grid) -> string
+        val out = StringWriter()
+        val shown = front match
+            Some(g) if g.width == next.width && g.height == next.height -> g
+            _ ->
+                out.write(Csi + "0m" + Csi + "H" + Csi + "2J")
+                current = Style.plain()
+                cursorX = 0
+                cursorY = 0
+                Grid(next.width, next.height)
+        for y in 0 ..< next.height
+            var x = 0
+            while x < next.width
+                val cell = next(x, y)
+                if cell.isContinuation() || cell == shown(x, y)
+                    x += 1
+                    continue
+                out.write(moveTo(next, x, y))
+                out.write(sgr(current, cell.style, mode))
+                current = cell.style
+                out.write(cell.text)
+                val w = if x + 1 < next.width && next(x + 1, y).isContinuation() then 2 else 1
+                cursorX = x + w
+                cursorY = y
+                if cursorX >= next.width then cursorX = -1
+                x += w
+        if current != Style.plain()
+            out.write(Csi + "0m")
+            current = Style.plain()
+        front = Some(next.copy())
+        out.text()
+
+    // The bytes that bring the cursor to `x`, `y`: a cursor movement, or, where it is shorter, the
+    // cells between the cursor and `x` written again, when they are in the current style and one
+    // column each.
+    private moveTo(next: Grid, x: int, y: int) -> string
+        val move = cursorMove(cursorX, cursorY, x, y)
+        if move.isEmpty() || cursorY != y || cursorX < 0 || cursorX > x then return move
+        val again = StringWriter()
+        var bytes = 0
+        for col in cursorX ..< x
+            val c = next(col, y)
+            if c.style != current || c.isContinuation() || (col + 1 < next.width && next(col + 1, y).isContinuation())
+                return move
+            bytes += c.text.byteLength()
+            if bytes >= move.byteLength() then return move
+            again.write(c.text)
+        again.text()

@@ -1,0 +1,96 @@
+module tui
+
+// How many columns of a terminal a character, and a piece of text, takes.
+//
+// The rules, read from the tables in `width_table.avin`:
+//
+// - Two columns for East Asian Wide and Fullwidth characters: CJK ideographs, kana, Hangul
+//   syllables, fullwidth forms, and the emoji shown as pictures by default.
+// - None for combining marks, format characters such as the zero-width joiner, and the Hangul vowels
+//   and finals that join the syllable before them. They are drawn in the cell of the character before
+//   them.
+// - One for everything else, the ambiguous East Asian characters and unassigned code points included.
+// - Control characters (U+0000 to U+001F, U+007F to U+009F) are never sent to the terminal: each is
+//   drawn as U+FFFD, which takes one column.
+
+// The character a cell shows for `c`: U+FFFD for a control character, `c` itself otherwise.
+sanitize(c: char) -> char = if c.isControl() then '\u{fffd}' else c
+
+// The columns `c` takes when drawn on its own.
+charWidth(c: char) -> int
+    val n = int(c)
+    if n < 0xa0 then return 1
+    if inRanges(zeroWidthRanges, n) then return 0
+    if inRanges(wideRanges, n) then 2 else 1
+
+// Whether `c` takes no column of its own, so that it belongs to the cell of the character before it.
+isZeroWidth(c: char) -> bool = int(c) >= 0xa0 && inRanges(zeroWidthRanges, int(c))
+
+// Whether `c` has the Emoji property and is beyond ASCII: a variation selector 16 after it asks for
+// the two-column picture.
+private isEmojiBase(c: char) -> bool = int(c) >= 0x80 && inRanges(emojiRanges, int(c))
+
+// Whether `n` is inside one of the spans of `table`, pairs of first and last code points, sorted.
+private inRanges(table: Array[int], n: int) -> bool
+    var lo = 0
+    var hi = table.length() / 2
+    while lo < hi
+        val mid = (lo + hi) / 2
+        if n < table(2 * mid) then hi = mid
+        else if n > table(2 * mid + 1) then lo = mid + 1
+        else return true
+    false
+
+// One cell's worth of text: a character and the characters that join it, and the columns it takes.
+data Cluster(text: string, width: int)
+
+private val Zwj: char = '\u{200d}'
+private val Vs16: char = '\u{fe0f}'
+
+private isRegionalIndicator(c: char) -> bool = '\u{1f1e6}' <= c <= '\u{1f1ff}'
+
+// The text cut into the clusters each cell holds, in order.
+//
+// A cluster is a character and the zero-width characters after it. A zero-width joiner also takes the
+// character after it into the cluster, so an emoji sequence joined by them (a family, a profession) is
+// one cluster as wide as its first character. A variation selector 16 after an emoji makes the cluster
+// two columns. Two regional indicators are one flag, two columns. A control character is a cluster of
+// its own, U+FFFD. Zero-width characters at the start, with nothing before them to join, are dropped.
+clusters(text: string) -> Vector[Cluster]
+    val out = Vector.newBuilder[Cluster]()
+    val cs = text.chars()
+    val n = cs.length()
+    var i = 0
+    while i < n && isZeroWidth(cs(i))
+        i += 1
+    while i < n
+        val base = cs(i)
+        if base.isControl()
+            out.addOne(Cluster("\u{fffd}", 1))
+            i += 1
+            continue
+        val b = StringWriter()
+        b.write(base.toString())
+        var width = charWidth(base)
+        i += 1
+        if isRegionalIndicator(base) && i < n && isRegionalIndicator(cs(i))
+            b.write(cs(i).toString())
+            width = 2
+            i += 1
+        while i < n && isZeroWidth(cs(i))
+            val c = cs(i)
+            b.write(c.toString())
+            i += 1
+            if c == Vs16 && width == 1 && isEmojiBase(base) then width = 2
+            if c == Zwj && i < n && !cs(i).isControl()
+                b.write(cs(i).toString())
+                i += 1
+        out.addOne(Cluster(b.text(), width))
+    out.result()
+
+// The columns `text` takes, cluster by cluster.
+textWidth(text: string) -> int
+    var w = 0
+    for c in clusters(text)
+        w += c.width
+    w

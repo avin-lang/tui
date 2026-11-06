@@ -1,0 +1,75 @@
+module tui
+
+// How many colours the terminal shows. A colour beyond what it shows is sent as the nearest it has.
+data ColorMode
+    // Any colour, as three channels of 0 to 255.
+    TrueColor
+    // The 256 of the extended palette: the sixteen basic colours, a 6 by 6 by 6 cube and 24 greys.
+    Palette256
+    // The sixteen basic colours.
+    Basic16
+
+// The red, green and blue the sixteen basic colours have in xterm's default palette, which is what a
+// colour is matched against when it is brought down to sixteen.
+private val basicRgb: Array[int] = [
+    0x000000, 0xcd0000, 0x00cd00, 0xcdcd00, 0x0000ee, 0xcd00cd, 0x00cdcd, 0xe5e5e5,
+    0x7f7f7f, 0xff0000, 0x00ff00, 0xffff00, 0x5c5cff, 0xff00ff, 0x00ffff, 0xffffff
+]
+
+// The levels of each channel in the palette's 6 by 6 by 6 cube.
+private val cubeLevels: Array[int] = [0, 95, 135, 175, 215, 255]
+
+// The colour `c` as the terminal in `mode` can show it: unchanged where it can, the nearest otherwise.
+// `Default` and the basic colours are shown by every terminal.
+reduce(c: Color, mode: ColorMode) -> Color = (c, mode) match
+    (Default, _) -> c
+    (Basic(_), _) -> c
+    (_, TrueColor) -> c
+    (Indexed(_), Palette256) -> c
+    (Rgb(r, g, b), Palette256) -> Indexed(nearest256(r, g, b))
+    (Indexed(n), Basic16) ->
+        val rgb = indexedRgb(n)
+        if n < 16 then Basic(n) else Basic(nearest16(rgb >> 16, (rgb >> 8) & 0xff, rgb & 0xff))
+    (Rgb(r, g, b), Basic16) -> Basic(nearest16(r, g, b))
+
+// The red, green and blue, packed as `0xrrggbb`, of the palette's colour `n`.
+indexedRgb(n: int) -> int = n match
+    0..15 -> basicRgb(n)
+    16..231 ->
+        val k = n - 16
+        (cubeLevels(k / 36) << 16) | (cubeLevels((k / 6) % 6) << 8) | cubeLevels(k % 6)
+    _ ->
+        val v = 8 + 10 * (n - 232)
+        (v << 16) | (v << 8) | v
+
+// The palette's colour nearest to `r`, `g`, `b`, among the cube and the greys: the cube's colour of
+// each channel's nearest level, or the nearest grey where that is closer.
+nearest256(r: int, g: int, b: int) -> int
+    val cube = 16 + 36 * cubeIndex(r) + 6 * cubeIndex(g) + cubeIndex(b)
+    val average = (r + g + b) / 3
+    val grey = if average < 8 then 232 else if average > 238 then 255 else 232 + (average - 8 + 5) / 10
+    if distance(indexedRgb(grey), r, g, b) < distance(indexedRgb(cube), r, g, b) then grey else cube
+
+// The basic colour nearest to `r`, `g`, `b`.
+nearest16(r: int, g: int, b: int) -> int
+    var best = 0
+    var bestDistance = int.MaxValue
+    for i in 0 ..< 16
+        val d = distance(basicRgb(i), r, g, b)
+        if d < bestDistance
+            best = i
+            bestDistance = d
+    best
+
+// The cube level nearest to `v`.
+private cubeIndex(v: int) -> int = v match
+    0..47 -> 0
+    48..114 -> 1
+    _ -> (v - 35) / 40
+
+// The squared distance between a packed colour and `r`, `g`, `b`.
+private distance(rgb: int, r: int, g: int, b: int) -> int
+    val dr = (rgb >> 16) - r
+    val dg = ((rgb >> 8) & 0xff) - g
+    val db = (rgb & 0xff) - b
+    dr * dr + dg * dg + db * db

@@ -1,0 +1,65 @@
+module tui
+
+// A colour a cell is drawn in. `Default` is whatever the terminal's own foreground or background is;
+// `Basic(n)` is one of the sixteen colours every terminal has, 0 to 7 the normal ones and 8 to 15 their
+// bright forms; `Indexed(n)` is one of the 256 of the extended palette; `Rgb` is a colour of its own,
+// each channel 0 to 255. A terminal that cannot show a colour is sent the nearest it can.
+data Color
+    Default
+    Basic(n: int)
+    Indexed(n: int)
+    Rgb(r: int, g: int, b: int)
+
+// The sixteen basic colours by name.
+val Black: Color = Basic(0)
+val Red: Color = Basic(1)
+val Green: Color = Basic(2)
+val Yellow: Color = Basic(3)
+val Blue: Color = Basic(4)
+val Magenta: Color = Basic(5)
+val Cyan: Color = Basic(6)
+val White: Color = Basic(7)
+val BrightBlack: Color = Basic(8)
+val BrightRed: Color = Basic(9)
+val BrightGreen: Color = Basic(10)
+val BrightYellow: Color = Basic(11)
+val BrightBlue: Color = Basic(12)
+val BrightMagenta: Color = Basic(13)
+val BrightCyan: Color = Basic(14)
+val BrightWhite: Color = Basic(15)
+
+// The attributes of a cell, a set of bits: `Bold | Underline`.
+val Bold: int = 1
+val Dim: int = 2
+val Italic: int = 4
+val Underline: int = 8
+val Reverse: int = 16
+
+// Every attribute bit there is; other bits of an attribute set are ignored.
+val AllAttributes: int = 31
+
+// How a cell is drawn: its colours and its attributes.
+data Style(fg: Color, bg: Color, attrs: int)
+
+object Style
+    // The terminal's own colours and no attributes.
+    plain() -> Style = Style(Default, Default, 0)
+
+    // The colour `fg` on the terminal's own background.
+    fg(c: Color) -> Style = Style(c, Default, 0)
+
+impl Style
+    // This style with the foreground `c`.
+    withFg(c: Color) -> Style = Style(c, bg, attrs)
+
+    // This style with the background `c`.
+    withBg(c: Color) -> Style = Style(fg, c, attrs)
+
+    // This style with the attributes `a` added.
+    with(a: int) -> Style = Style(fg, bg, attrs | (a & AllAttributes))
+
+    // This style with the attributes `a` taken away.
+    without(a: int) -> Style = Style(fg, bg, attrs & ~a)
+
+    // Whether every attribute of `a` is on.
+    has(a: int) -> bool = (attrs & a) == a
