@@ -1,0 +1,57 @@
+// A box with a live clock, a meter filling and emptying with the seconds, and the last keys pressed.
+// Press q to quit.
+import avin.time
+import dev.avinlang.tui
+import dev.avinlang.tui.{Bold, Char, Ctrl, Cyan, Event, Green, Grid, KeyPress, Mouse, Options, Paste,
+                         Rect, Resize, Rounded, Stop, Style, Terminal, Yellow}
+
+main() -> int
+    val term = Terminal.open(Options()) match
+        Ok(t) -> t
+        Err(e) ->
+            eprintln(s"hello: ${e.message()}")
+            return 1
+    val keys = Buffer[string]()
+    loop
+        val g = term.frame()
+        draw(g, keys)
+        term.present(g)
+        term.poll(time.millis(250)) match
+            Some(KeyPress(Char('q'), 0)) -> break
+            Some(Stop(_)) -> break
+            Some(e) -> remember(keys, describe(e))
+            None -> ()
+    term.close()
+    0
+
+// Keeps the last ten things that happened, newest first.
+remember(keys: Buffer[string], what: string)
+    keys.prepend(what)
+    if keys.length() > 10 then keys.remove(keys.length() - 1)
+
+describe(e: Event) -> string
+describe(KeyPress(k, mods)) = s"key ${tui.keyName(k, mods)}"
+describe(Mouse(m)) = s"mouse ${m.action} button ${m.button} at ${m.x},${m.y}"
+describe(Paste(text)) = s"paste of ${text.charCount()} characters"
+describe(Resize(cols, rows)) = s"resized to $cols x $rows"
+describe(Stop(sig)) = s"signal $sig"
+
+draw(g: Grid, keys: Buffer[string])
+    val r = Rect(2, 1, minOf(g.width - 4, 60), minOf(g.height - 2, 18))
+    g.box(r, Style.fg(Cyan), Rounded, "hello, tui")
+    val inside = r.inset(1)
+    val secondsOfDay = time.now().epochMicros / 1000000 % 86400
+    val seconds = int(secondsOfDay % 60)
+    val clock = s"${two(secondsOfDay / 3600)}:${two(secondsOfDay / 60 % 60)}:${two(long(seconds))} UTC"
+    g.text(inside.x + 1, inside.y, clock, Style.fg(Yellow).with(Bold), inside)
+    g.meter(inside.x + 1, inside.y + 2, inside.w - 2, real(seconds) / 59.0, Style.fg(Green), Style.plain(), inside)
+    g.text(inside.x + 1, inside.y + 4, "press q to quit; keys, clicks and pastes show below", Style.plain().with(tui.Dim), inside)
+    var row = inside.y + 6
+    for k in keys
+        g.text(inside.x + 1, row, k, Style.plain(), inside)
+        row += 1
+
+minOf(a: int, b: int) -> int = if a < b then a else b
+
+// `n`, below 100, in two digits.
+two(n: long) -> string = if n < 10 then s"0$n" else s"$n"

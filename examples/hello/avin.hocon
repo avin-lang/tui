@@ -1,0 +1,5 @@
+package { name = "hello", version = "0.1.0", description = "A box, a live clock, a meter and the keys pressed, drawn with tui" }
+
+dependencies {
+  tui { path = "../.." }
+}

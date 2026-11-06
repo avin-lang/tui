@@ -29,6 +29,21 @@ val Shift: int = 1
 val Alt: int = 2
 val Ctrl: int = 4
 
+// A key as a person names it, its modifiers first: `Ctrl-Alt-x`, `Shift-Up`, `F5`, `Space`.
+keyName(k: Key, mods: int) -> string
+    val out = StringWriter()
+    if (mods & Ctrl) != 0 then out.write("Ctrl-")
+    if (mods & Alt) != 0 then out.write("Alt-")
+    if (mods & Shift) != 0 then out.write("Shift-")
+    out.write(baseName(k))
+    out.text()
+
+private baseName(k: Key) -> string
+baseName(Char(' ')) = "Space"
+baseName(Char(c)) = c.toString()
+baseName(F(n)) = s"F$n"
+baseName(k) = s"$k"
+
 // What a mouse did.
 data MouseAction
     Press
