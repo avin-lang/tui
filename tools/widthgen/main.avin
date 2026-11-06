@@ -11,11 +11,10 @@ import avin.process
 // A run of code points, both ends included.
 data Span(first: int, last: int)
 
-main()
-    val args = process.args()
+main(args: Vector[string]) -> int
     if args.length() != 2
         eprintln("usage: widthgen <unicode data directory> <output file>")
-        process.exit(2)
+        return 2
     val dir = args(0)
     val categories = readFile(dir + "/DerivedGeneralCategory.txt")
     val eastAsian = readFile(dir + "/EastAsianWidth.txt")
@@ -24,7 +23,7 @@ main()
     val version = versionOf(eastAsian)
     if versionOf(categories) != version
         eprintln(s"DerivedGeneralCategory.txt is Unicode ${versionOf(categories)} and EastAsianWidth.txt $version")
-        process.exit(1)
+        return 1
 
     // Zero width: nonspacing and enclosing marks, format characters but the soft hyphen and the marks
     // that are written before a number and shown, and the Hangul vowels and finals that join the
@@ -52,10 +51,12 @@ main()
     table(out, "wideRanges", "Characters that take two columns: East Asian Wide and Fullwidth.", merged(wide))
     table(out, "emojiRanges", "Characters beyond ASCII with the Emoji property.", merged(pictures))
     fs.writeText(args(1), out.text()) match
-        Ok(_) -> println(s"wrote ${args(1)} from Unicode $version")
+        Ok(_) ->
+            println(s"wrote ${args(1)} from Unicode $version")
+            0
         Err(e) ->
             eprintln(s"${args(1)}: ${e.message()}")
-            process.exit(1)
+            1
 
 private readFile(file: string) -> string = fs.readText(file) match
     Ok(text) -> text

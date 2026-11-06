@@ -55,7 +55,8 @@ private isRegionalIndicator(c: char) -> bool = '\u{1f1e6}' <= c <= '\u{1f1ff}'
 // character after it into the cluster, so an emoji sequence joined by them (a family, a profession) is
 // one cluster as wide as its first character. A variation selector 16 after an emoji makes the cluster
 // two columns. Two regional indicators are one flag, two columns. A control character is a cluster of
-// its own, U+FFFD. Zero-width characters at the start, with nothing before them to join, are dropped.
+// its own, U+FFFD, joining nothing. Zero-width characters with nothing before them to join, at the
+// start or after a control character, are dropped.
 clusters(text: string) -> Vector[Cluster]
     val out = Vector.newBuilder[Cluster]()
     val cs = text.chars()
@@ -68,6 +69,8 @@ clusters(text: string) -> Vector[Cluster]
         if base.isControl()
             out.addOne(Cluster("\u{fffd}", 1))
             i += 1
+            while i < n && isZeroWidth(cs(i))
+                i += 1
             continue
         val b = StringWriter()
         b.write(base.toString())

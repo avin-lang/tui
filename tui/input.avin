@@ -122,7 +122,11 @@ class Decoder()
             Skip(used) ->
                 drop(used)
                 flush()
-            Partial -> None
+            Partial ->
+                // Only a character cut short is still partial when nothing more is coming, and it is
+                // all that is pending.
+                drop(length())
+                Some(KeyPress(Char('\u{fffd}'), 0))
 
     // Every event the bytes fed so far make, flushing at the end; for tests.
     drain() -> Vector[Event]
