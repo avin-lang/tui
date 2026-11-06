@@ -1,0 +1,79 @@
+module dev.avinlang.top
+
+import dev.avinlang.tui.{Bold, BrightBlack, Color, Cyan, Green, Grid, Magenta, Rect, Red, Style, Yellow, textWidth}
+
+// The top of the screen, in two halves side by side: on the left a meter per processor (or one for
+// all of them where the source cannot tell them apart), then memory and swap; on the right the
+// processors beyond the first half, then tasks, load and uptime. Answers the rows it took.
+drawHeader(g: Grid, s: Sample, u: Usage) -> int
+    val half = g.width / 2
+    val left = Buffer[(string, Vector[(real, Color)], string)]()
+    val right = Buffer[(string, Vector[(real, Color)], string)]()
+    if u.cores.isEmpty()
+        left.addOne(cpuMeter("CPU", u.total))
+    else
+        val firstHalf = (u.cores.length() + 1) / 2
+        for (c, i) in u.cores.zipWithIndex()
+            val m = cpuMeter(s"$i", c)
+            if i < firstHalf then left.addOne(m) else right.addOne(m)
+    val m = s.memory
+    left.addOne(("Mem", [(fraction(m.used, m.total), Green), (fraction(m.compressed, m.total), Magenta),
+                         (fraction(m.cached, m.total), Yellow)],
+                 s"${bytes(m.used + m.compressed)}/${bytes(m.total)}"))
+    left.addOne(("Swp", [(fraction(s.swap.used, s.swap.total), Red)], s"${bytes(s.swap.used)}/${bytes(s.swap.total)}"))
+    val label = labelWidth(left, right)
+    for (meter, i) in left.zipWithIndex()
+        drawMeter(g, Rect(0, i, half - 1, 1), label, meter)
+    for (meter, i) in right.zipWithIndex()
+        drawMeter(g, Rect(half + 1, i, g.width - half - 1, 1), label, meter)
+    val running = s.procs.count(p -> p.isRunning())
+    val info: Vector[(string, string)] = [
+        ("Tasks: ", s"${s.procs.length()}, $running running"),
+        ("Load average: ", f"${s.load.one}%.2f ${s.load.five}%.2f ${s.load.fifteen}%.2f"),
+        ("Uptime: ", uptime(s.now - s.bootTime))
+    ]
+    val clip = Rect(half + 1, 0, g.width - half - 1, g.height)
+    for ((name, value), i) in info.zipWithIndex()
+        val y = right.length() + i
+        val x = g.text(half + 1, y, name, Style.fg(Cyan), clip)
+        g.text(x, y, value, Style.plain().with(Bold), clip)
+    maxInt(left.length(), right.length() + info.length())
+
+// The meter for one share of the processors: the programs' part green, the system's red, and the
+// busy percent.
+cpuMeter(label: string, c: CpuShare) -> (string, Vector[(real, Color)], string) =
+    (label, [(c.user, Green), (c.system, Red)], f"${c.busy() * 100.0}%.1f%")
+
+private labelWidth(a: Buffer[(string, Vector[(real, Color)], string)], b: Buffer[(string, Vector[(real, Color)], string)]) -> int
+    var w = 0
+    for (l, _, _) in a
+        w = maxInt(w, textWidth(l))
+    for (l, _, _) in b
+        w = maxInt(w, textWidth(l))
+    w
+
+// `part` of `whole`, 0 where there is no whole.
+fraction(part: long, whole: long) -> real = if whole <= 0 then 0.0 else real(part) / real(whole)
+
+// Draws a meter in `r`'s first row: its label right-aligned in `labelWidth` columns, then a bar in
+// brackets with one `|` per filled cell, each part in its colour, one after another, and the figure
+// written over the bar's right end.
+drawMeter(g: Grid, r: Rect, labelWidth: int, meter: (string, Vector[(real, Color)], string))
+    val (label, parts, figure) = meter
+    if r.isEmpty() then return
+    g.textIn(r.x, r.y, labelWidth, label, Style.fg(Cyan), 1, r)
+    val inner = Rect(r.x + labelWidth + 1, r.y, r.w - labelWidth - 2, 1)
+    g.text(r.x + labelWidth, r.y, "[", Style.plain().with(Bold), r)
+    if inner.w < 0 then return
+    g.text(inner.right(), r.y, "]", Style.plain().with(Bold), r)
+    var sum = 0.0
+    var from = 0
+    for (share, color) in parts
+        sum += if share > 0.0 then share else 0.0
+        val upTo = minInt(int(sum * real(inner.w) + 0.5), inner.w)
+        for i in from ..< upTo
+            g.text(inner.x + i, r.y, "|", Style.fg(color).with(Bold), inner)
+        if upTo > from then from = upTo
+    g.text(inner.right() - textWidth(figure), r.y, figure, Style.fg(BrightBlack).with(Bold), inner)
+
+private maxInt(a: int, b: int) -> int = if a > b then a else b

@@ -1,0 +1,18 @@
+module tests
+
+// Processes and samples made to order for the tests.
+import dev.avinlang.top.{Load, Memory, Proc, Sample, Swap, Ticks}
+
+// A process with times in hundredths: `user` of its `cpu` in programs, the rest in the system.
+proc(pid: long, ppid: long = 1, command: string = "cmd", cpu: long = 0, user: long = 0, rss: long = 1000,
+     state: string = "S", percent: real = 0.0) -> Proc =
+    Proc(pid, ppid, "ed", percent, real(rss) / 10000.0, rss, cpu, user, state, command)
+
+// A sample at `at` microseconds of the given processes and processors' ticks, on a machine of `cpus`.
+sample(at: long, procs: Vector[Proc], cpus: int = 4, cores: Vector[Ticks] = []) -> Sample = Sample(
+    at, 1000000 + at / 1000000, cpus, cores, Load(1.5, 1.25, 1.0),
+    Memory(long(16) * 1073741824, long(4) * 1073741824, long(1) * 1073741824, long(2) * 1073741824),
+    Swap(long(2) * 1073741824, long(512) * 1048576), 1000000 - 90061, procs)
+
+// Whether two reals differ by less than a millionth.
+near(a: real, b: real) -> bool = -0.000001 < a - b < 0.000001

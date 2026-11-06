@@ -46,6 +46,16 @@ most the time given.
 avin run examples/hello
 ```
 
+`examples/top` is a simplified htop for macOS: meters for the processors, memory and swap, the load
+and uptime, and every process in a table that sorts (`P` `M` `T` `N`), filters (`/`), shows the tree
+of parents (`t`) and sends a process TERM (`k`, then `y`). `h` lists the keys, `q` quits. It reads
+the system through `ps`, `sysctl` and `vm_stat`, behind a `Source` trait a native reader can replace.
+
+```text
+avin run examples/top
+avin test examples/top
+```
+
 ## What is in it
 
 | | |

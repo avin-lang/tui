@@ -1,0 +1,58 @@
+// A simplified htop: a meter for the processors, memory and swap, the load, the uptime, and every
+// process in a table that sorts, filters, shows the tree of parents and children, and sends a
+// process TERM. Press h for the keys, q to quit.
+import avin.process
+import avin.signal
+import avin.time
+import dev.avinlang.top.{App, CommandSource, Kill, Quit, Sample, Source, Stay, Usage, usage}
+import dev.avinlang.tui.{Options, Terminal}
+
+main() -> int = Terminal.use(Options(), run) match
+    Ok(()) -> 0
+    Err(e) ->
+        eprintln(s"top: ${e.message()}")
+        1
+
+// How long between two looks at the system.
+val every: time.Duration = time.millis(1500)
+
+// The first look is compared with one taken this soon after, so the processors' use shows at once.
+val first: time.Duration = time.millis(300)
+
+// Looks at the system, draws, and waits for a key or the next look, until q.
+run(term: Terminal)
+    val source: Source = CommandSource()
+    val app = App(source.describe())
+    var before: Option[Sample] = None
+    var current: Option[(Sample, Usage)] = None
+    var due = time.monotonic()
+    loop
+        if time.monotonic() >= due
+            source.sample() match
+                Ok(s) ->
+                    val u = usage(before, s)
+                    app.update(s, u)
+                    due = time.monotonic() + (if before.isEmpty() then first else every)
+                    before = Some(s)
+                    current = Some((s, u))
+                Err(why) ->
+                    app.message = why
+                    due = time.monotonic() + every
+        val g = term.frame()
+        current match
+            Some((s, u)) -> app.draw(g, s, u)
+            None -> g.text(0, 0, if app.message.nonEmpty() then app.message else "looking…")
+        term.present(g)
+        val wait = due - time.monotonic()
+        term.poll(if wait > time.millis(0) then wait else time.millis(0)) match
+            Some(e) -> app.handle(e) match
+                Quit -> return
+                Kill(pid) ->
+                    app.message = process.signal(pid, signal.Terminate) match
+                        Ok(()) -> s"sent TERM to $pid"
+                        Err(e) -> s"$pid: ${e.message()}"
+                    due = time.monotonic()
+                Stay -> current match
+                    Some((s, u)) -> app.update(s, u)
+                    None -> ()
+            None -> ()

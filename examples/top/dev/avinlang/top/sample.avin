@@ -1,0 +1,67 @@
+module dev.avinlang.top
+
+// What one look at the machine finds. A `Source` takes these; everything shown is worked out from
+// two of them in a row.
+
+// One process as the system reports it. Times are in hundredths of a second of processor time since
+// the process started, `cpuTime` user and system together; `rssKb` is its resident memory in KiB.
+// `cpuPercent` is the system's own recent average, used before there are two samples to compare.
+data Proc(
+    pid: long,
+    ppid: long,
+    user: string,
+    cpuPercent: real,
+    memPercent: real,
+    rssKb: long,
+    cpuTime: long,
+    userTime: long,
+    state: string,
+    command: string
+)
+
+impl Proc
+    // Whether it has ended and waits for its parent to collect it.
+    isZombie() -> bool = state.startsWith("Z")
+
+    // Whether it is running or ready to run.
+    isRunning() -> bool = state.startsWith("R")
+
+// One processor's time since the machine started, in the system's ticks.
+data Ticks(user: long, system: long, idle: long)
+
+impl Ticks
+    total() -> long = user + system + idle
+
+// Memory in bytes: all there is, and what is in use split as htop shows it: `used` held by programs
+// and the system (active and wired pages), `compressed` held by the compressor, `cached` that the
+// system keeps but would give up (inactive pages).
+data Memory(total: long, used: long, compressed: long, cached: long)
+
+// Swap in bytes.
+data Swap(total: long, used: long)
+
+// The load averages over 1, 5 and 15 minutes.
+data Load(one: real, five: real, fifteen: real)
+
+// One look at the machine, taken at `at` (microseconds of the monotonic clock). `cores` holds each
+// processor's ticks where the source can read them, and is empty where it cannot; `cpus` is how many
+// processors there are either way. `bootTime` and `now` are seconds since the epoch.
+data Sample(
+    at: long,
+    now: long,
+    cpus: int,
+    cores: Vector[Ticks],
+    load: Load,
+    memory: Memory,
+    swap: Swap,
+    bootTime: long,
+    procs: Vector[Proc]
+)
+
+// Where samples come from. The one this program has runs the system's commands and reads their
+// output; one that asks the kernel directly can take its place without anything else changing.
+trait Source
+    sample() -> Result[Sample, string]
+
+    // A sentence saying where the numbers come from and what they lack, for the help screen.
+    describe() -> string

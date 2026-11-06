@@ -1,0 +1,113 @@
+module dev.avinlang.top
+
+// The process table's rows: which processes, in what order, and the text of each cell.
+
+// What the table is sorted by.
+data SortKey
+    ByCpu
+    ByMem
+    ByTime
+    ByPid
+
+// The heading of the column a sort key sorts.
+sortTitle(k: SortKey) -> string
+sortTitle(ByCpu) = "CPU%"
+sortTitle(ByMem) = "MEM%"
+sortTitle(ByTime) = "TIME+"
+sortTitle(ByPid) = "PID"
+
+// One process as a row: the process, its processor use in percent of one processor, and what is
+// drawn before its command in the tree view (empty in the list).
+data Row(proc: Proc, cpu: real, branch: string)
+
+// The rows of every process with its use from `usage`.
+rowsOf(procs: Vector[Proc], usage: Usage) -> Vector[Row] =
+    procs.map(p -> Row(p, usage.procs.getOrElse(p.pid, 0.0), ""))
+
+// `rows` ordered by `key`: the largest first, except by pid, smallest first. Equal rows keep pid order.
+sortRows(rows: Vector[Row], key: SortKey) -> Vector[Row] =
+    rows.sortWith((a, b) -> compareRows(a, b, key))
+
+private compareRows(a: Row, b: Row, key: SortKey) -> int
+    val c = key match
+        ByCpu -> b.cpu.compare(a.cpu)
+        ByMem -> b.proc.rssKb.compare(a.proc.rssKb)
+        ByTime -> b.proc.cpuTime.compare(a.proc.cpuTime)
+        ByPid -> 0
+    if c != 0 then c else a.proc.pid.compare(b.proc.pid)
+
+// The rows whose command holds `text`, letter case aside; all of them for an empty `text`.
+filterRows(rows: Vector[Row], text: string) -> Vector[Row]
+    if text.isEmpty() then return rows
+    val needle = text.toLowerCase()
+    rows.filter(r -> r.proc.command.toLowerCase().contains(needle))
+
+// The rows as a tree by parent: each process followed by its children, indented under it, siblings
+// in the order of `rows`. A process whose parent is not among the rows (or is itself) is a root. A
+// loop of parents, which a pid taken again between two looks could make, is broken where it is met.
+treeRows(rows: Vector[Row]) -> Vector[Row]
+    val present = HashSet[long]() ++ rows.map(r -> r.proc.pid)
+    var children = HashMap[long, Vector[Row]]()
+    val roots = Vector.newBuilder[Row]()
+    for r in rows
+        val parent = r.proc.ppid
+        if parent != r.proc.pid && present.contains(parent)
+            children = children.updated(parent, children.getOrElse(parent, Vector[Row]()) :+ r)
+        else
+            roots.addOne(r)
+    val out = Vector.newBuilder[Row]()
+    var placed = HashSet[long]()
+    walk(r: Row, lead: string, branch: string)
+        if placed.contains(r.proc.pid) then return
+        placed = placed.incl(r.proc.pid)
+        out.addOne(Row(r.proc, r.cpu, branch))
+        val kids = children.getOrElse(r.proc.pid, Vector[Row]())
+        for (k, i) in kids.zipWithIndex()
+            val last = i == kids.length() - 1
+            walk(k, lead + (if last then "   " else "│  "), lead + (if last then "└─ " else "├─ "))
+    for r in roots.result()
+        walk(r, "", "")
+    // Processes caught in a loop of parents have no root to be reached from.
+    for r in rows
+        walk(r, "", "")
+    out.result()
+
+// The headings and widths of the table's columns.
+val headings: Vector[string] = ["PID", "USER", "CPU%", "MEM%", "RES", "TIME+", "COMMAND"]
+
+// The text of each cell of a row.
+cells(r: Row) -> Vector[string] = [
+    s"${r.proc.pid}",
+    r.proc.user,
+    f"${r.cpu}%.1f",
+    f"${r.proc.memPercent}%.1f",
+    kib(r.proc.rssKb),
+    clock(r.proc.cpuTime),
+    r.branch + r.proc.command
+]
+
+// A size in KiB as htop writes it: KiB up to 99999, then whole MiB up to 9999M, then GiB with one
+// decimal.
+kib(k: long) -> string
+kib(k < 100000) = s"$k"
+kib(k < 10240000) = s"${k / 1024}M"
+kib(k) = f"${real(k) / 1048576.0}%.1fG"
+
+// A size in bytes in the largest unit that leaves at least 1, one decimal: `512B`, `1.5K`, `20.1G`.
+bytes(b: long) -> string
+bytes(b < 1024) = s"${b}B"
+bytes(b < 1048576) = f"${real(b) / 1024.0}%.1fK"
+bytes(b < 1073741824) = f"${real(b) / 1048576.0}%.1fM"
+bytes(b) = f"${real(b) / 1073741824.0}%.1fG"
+
+// Processor time in hundredths as htop writes it: `m:ss.hh` under an hour, `hhh:mm:ss` from there.
+clock(h: long) -> string
+clock(h < 360000) = f"${h / 6000}%d:${h / 100 % 60}%02d.${h % 100}%02d"
+clock(h) = f"${h / 360000}%dh${h / 6000 % 60}%02d:${h / 100 % 60}%02d"
+
+// Seconds of uptime: `03:12:44`, or `5 days, 03:12:44`.
+uptime(secs: long) -> string
+    val t = if secs < 0 then long(0) else secs
+    val days = t / 86400
+    val hms = f"${t / 3600 % 24}%02d:${t / 60 % 60}%02d:${t % 60}%02d"
+    if days == 0 then hms else if days == 1 then s"1 day, $hms" else s"$days days, $hms"

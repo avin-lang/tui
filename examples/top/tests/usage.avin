@@ -1,0 +1,118 @@
+module tests
+
+// Processor use from two samples: each process's share, the total from the processes' times, and
+// the per-processor shares from ticks where a source has them.
+import dev.avinlang.top.{CpuShare, Ticks, percentOf, usage}
+
+@test("with one sample the processors read idle and each process has the system's own percent")
+firstLook()
+    val u = usage(None, sample(0, [proc(1, percent = 12.5), proc(2, percent = 0.0)]))
+    assertEq(u.total, CpuShare(0.0, 0.0))
+    assertEq(u.procs.get(1), Some(12.5))
+    assertEq(u.procs.get(2), Some(0.0))
+    assertEq(u.cores.length(), 0)
+
+@test("a process's percent is the time it used over the time that passed, of one processor")
+processPercent()
+    val a = sample(0, [proc(7, cpu = 100, user = 60)])
+    val b = sample(2000000, [proc(7, cpu = 250, user = 150)])
+    // 1.5 s of processor time in 2 s.
+    assert(near(usage(Some(a), b).procs.get(7).get(), 75.0))
+
+@test("a process may use more than one processor")
+moreThanOne()
+    val a = sample(0, [proc(7, cpu = 0)])
+    val b = sample(1000000, [proc(7, cpu = 300, user = 300)])
+    assert(near(usage(Some(a), b).procs.get(7).get(), 300.0))
+
+@test("the total is every process's time over all the processors' time, split into programs and system")
+totalSplit()
+    val a = sample(0, [proc(1, cpu = 0), proc(2, cpu = 0)], cpus = 4)
+    val b = sample(1000000, [proc(1, cpu = 100, user = 80), proc(2, cpu = 100, user = 20)], cpus = 4)
+    val u = usage(Some(a), b)
+    // 2 s used of 4 s: 1 s in programs, 1 s in the system.
+    assert(near(u.total.user, 0.25))
+    assert(near(u.total.system, 0.25))
+    assert(near(u.total.busy(), 0.5))
+
+@test("a process that started since the last look counts all its time")
+newProcess()
+    val a = sample(0, [proc(1, cpu = 0)])
+    val b = sample(1000000, [proc(1, cpu = 0), proc(9, cpu = 40, user = 40)])
+    assert(near(usage(Some(a), b).procs.get(9).get(), 40.0))
+
+@test("a pid taken by a new process, its time lower or its command another, counts the new one's time")
+pidReused()
+    val a = sample(0, [proc(5, command = "old", cpu = 5000, user = 5000)])
+    val lower = sample(1000000, [proc(5, command = "old", cpu = 30, user = 30)])
+    assert(near(usage(Some(a), lower).procs.get(5).get(), 30.0))
+    val other = sample(1000000, [proc(5, command = "new", cpu = 6000, user = 6000)])
+    assert(near(usage(Some(a), other).procs.get(5).get(), 6000.0))
+
+@test("a process that ended since the last look is in neither the table nor the total")
+ended()
+    val a = sample(0, [proc(1, cpu = 0), proc(2, cpu = 0)])
+    val b = sample(1000000, [proc(1, cpu = 10, user = 10)])
+    val u = usage(Some(a), b)
+    assertEq(u.procs.get(2), None)
+    assert(near(u.total.user, 10.0 / 400.0))
+
+@test("no time passing is no use rather than a division by zero")
+noTime()
+    val a = sample(5, [proc(1, cpu = 0)])
+    val b = sample(5, [proc(1, cpu = 10, user = 10)])
+    val u = usage(Some(a), b)
+    assertEq(u.procs.get(1), Some(0.0))
+    assertEq(u.total, CpuShare(0.0, 0.0))
+    assertEq(percentOf(10, 0), 0.0)
+    assertEq(percentOf(10, -5), 0.0)
+
+@test("the total is held to all of the processors, the system's part cut first")
+totalHeld()
+    val a = sample(0, [proc(1, cpu = 0)], cpus = 1)
+    val b = sample(1000000, [proc(1, cpu = 300, user = 80)], cpus = 1)
+    val u = usage(Some(a), b)
+    assert(near(u.total.user, 0.8))
+    assert(near(u.total.system, 0.2))
+
+@test("a system time that seems to go down counts as none")
+systemDown()
+    val a = sample(0, [proc(1, cpu = 100, user = 10)])
+    val b = sample(1000000, [proc(1, cpu = 110, user = 60)])
+    // user grew 50, system went from 90 to 50.
+    val u = usage(Some(a), b)
+    assert(near(u.procs.get(1).get(), 50.0))
+    assert(near(u.total.system, 0.0))
+
+@test("no processes: no use")
+noProcesses()
+    val u = usage(Some(sample(0, [])), sample(1000000, []))
+    assertEq(u.total, CpuShare(0.0, 0.0))
+    assertEq(u.procs.size(), 0)
+
+@test("each processor's share from the growth of its ticks, and the total from all of them")
+perCore()
+    val a = sample(0, [], cores = [Ticks(100, 100, 800), Ticks(0, 0, 0)])
+    val b = sample(1000000, [], cores = [Ticks(150, 110, 840), Ticks(10, 0, 90)])
+    val u = usage(Some(a), b)
+    assertEq(u.cores.length(), 2)
+    assert(near(u.cores(0).user, 0.5))
+    assert(near(u.cores(0).system, 0.1))
+    assert(near(u.cores(1).user, 0.1))
+    assert(near(u.cores(1).system, 0.0))
+    assert(near(u.total.user, 60.0 / 200.0))
+    assert(near(u.total.system, 10.0 / 200.0))
+
+@test("a processor whose ticks did not move reads idle, and a changed count of processors reads idle")
+perCoreEdges()
+    val a = sample(0, [], cores = [Ticks(5, 5, 5)])
+    val same = usage(Some(a), sample(1000000, [], cores = [Ticks(5, 5, 5)]))
+    assertEq(same.cores(0), CpuShare(0.0, 0.0))
+    val grown = usage(Some(a), sample(1000000, [], cores = [Ticks(9, 9, 9), Ticks(1, 1, 1)]))
+    assertEq(grown.cores, [CpuShare(0.0, 0.0), CpuShare(0.0, 0.0)])
+    // Without ticks to compare, the total comes from the processes, of which there are none.
+    assertEq(grown.total, CpuShare(0.0, 0.0))
+    val withProc = usage(Some(sample(0, [proc(1)], cpus = 2, cores = [Ticks(5, 5, 5)])),
+                         sample(1000000, [proc(1, cpu = 100, user = 100)], cpus = 2, cores = [Ticks(9, 9, 9), Ticks(1, 1, 1)]))
+    assert(near(withProc.total.user, 0.5))
+    assertEq(usage(None, sample(0, [], cores = [Ticks(1, 1, 1)])).cores, [CpuShare(0.0, 0.0)])

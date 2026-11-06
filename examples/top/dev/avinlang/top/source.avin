@@ -1,0 +1,26 @@
+module dev.avinlang.top
+
+import avin.process.Command
+import avin.time
+
+// Samples read from what `ps`, `sysctl` and `vm_stat` print, three commands a look. No command the
+// system has prints each processor's ticks, so the processors are read as one: their use is the sum
+// of what every process used since the last look, which leaves out processes that ended in between.
+class CommandSource(): Source
+    override sample() -> Result[Sample, string]
+        val at = time.monotonic().micros
+        val now = time.now().epochMicros / 1000000
+        val info = parseSysctl(run("sysctl", sysctlNames)?) match
+            Some(i) -> i
+            None -> return Err("could not read what sysctl printed")
+        val vm = parseVmStat(run("vm_stat", [])?) match
+            Some(v) -> v
+            None -> return Err("could not read what vm_stat printed")
+        val procs = parsePs(run("ps", ["-axo", psFormat])?)
+        Ok(Sample(at, now, info.cpus, [], info.load, vm.memory(info.memory), info.swap, info.bootTime, procs))
+
+    override describe() -> string = "ps, sysctl and vm_stat: no command prints each processor's ticks, so one meter shows them all"
+
+// What `program` printed, or why it printed nothing.
+private run(program: string, args: Vector[string]) -> Result[string, string] =
+    Command(program, args*).output().mapErr(e -> s"$program: $e")

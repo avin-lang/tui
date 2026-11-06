@@ -126,3 +126,30 @@ restores nothing.
 - **Why:** Avin has no way for a library to run code when the program exits or traps.
 - **Alternatives:** an exit hook in Avin's library, run on `exit` and after a trap's message (would
   let `open` register the restore, as Sysl's `sysl.tty` does for the mode).
+
+## `examples/top` reads the system through commands, behind a `Source` trait
+
+**Proposed** (branch `htop-demo`). The example runs `sysctl hw.ncpu vm.loadavg kern.boottime
+hw.memsize vm.swapusage`, `vm_stat` and `ps -axo pid=,ppid=,user=,pcpu=,pmem=,rss=,time=,utime=,state=,comm=`
+at every look (every 1.5 s, and 0.3 s after the first) and parses what they print. Everything else
+sees only `Sample`s from a `Source`.
+
+- A process's CPU% is the growth of its `time` (user and system) between two looks over the time
+  that passed, as a percent of one processor; with one look there is nothing to compare, and `ps`'s
+  own decaying `pcpu` is shown. A pid whose time went down or whose command changed is a new process.
+- No command on macOS prints each processor's ticks (`kern.cp_time` does not exist there; `iostat`
+  and `top` give one average), so the command source has no per-processor meters: one `CPU` meter
+  shows all processors, its user part the growth of every process's `utime`, its system part the
+  rest of `time`, over the time passed times the processor count. Processes that ended between two
+  looks are left out of it. The header draws one meter per processor whenever a source gives ticks.
+- Memory `used` is active plus wired pages, then the compressor's pages, then inactive (cached)
+  pages, each its own colour; the figure is used plus compressed over `hw.memsize`.
+- `sysctl` is asked without `-n`, so each value is found by its name rather than its line.
+
+- **Why:** Sysl's library has no calls for the process list, per-process times and memory,
+  per-processor ticks or the VM statistics, and this is a demo. The trait keeps the commands in one
+  class (`CommandSource`), so a native source replaces it without touching the rest.
+- **Alternatives:** Sysl bindings for `proc_listpids`/`proc_pidinfo`/`host_processor_info`/
+  `host_statistics64` (the real answer; needs Sysl to grow them); `top -l 2` for the total (blocks a
+  second per look); `iostat` (whole percents since boot unless given an interval, which blocks).
+- **Review with the user:** the native calls Sysl would need are listed in the branch's report.
