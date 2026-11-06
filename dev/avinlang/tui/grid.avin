@@ -1,4 +1,4 @@
-module tui
+module dev.avinlang.tui
 
 // One cell of the screen: the text it shows and how. `text` is one cluster (a character and the
 // zero-width characters joined to it). A two-column cluster is held by its left cell; the cell to its

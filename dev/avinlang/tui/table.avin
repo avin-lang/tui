@@ -1,4 +1,4 @@
-module tui
+module dev.avinlang.tui
 
 // A column of a table: its heading, its width in columns, and where its text sits: -1 left, 0
 // centred, 1 right. A width of 0 takes what the columns of fixed width leave, shared among every

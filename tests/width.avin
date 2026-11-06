@@ -2,8 +2,8 @@ module tests
 
 // Character widths and clusters: ASCII, CJK, emoji, combining marks, zero-width joiner sequences,
 // variation selectors, flags, control characters, and the edges of the tables.
-import tui
-import tui.{Cluster, charWidth, clusters, textWidth}
+import dev.avinlang.tui as tui
+import dev.avinlang.tui.{Cluster, charWidth, clusters, textWidth}
 
 widths(text: string) -> Vector[int] = clusters(text).map(c -> c.width)
 texts(text: string) -> Vector[string] = clusters(text).map(c -> c.text)

@@ -1,4 +1,4 @@
-module tui
+module dev.avinlang.tui
 
 // How many colours the terminal shows. A colour beyond what it shows is sent as the nearest it has.
 data ColorMode

@@ -1,4 +1,4 @@
-module tui
+module dev.avinlang.tui
 
 // How many columns of a terminal a character, and a piece of text, takes.
 //

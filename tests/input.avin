@@ -3,11 +3,11 @@ module tests
 // The input decoder over byte sequences: printable text, control keys, Escape and Alt, the cursor and
 // function keys in their CSI and SS3 forms with modifiers, bracketed paste, SGR mouse reports, and
 // every one of them split between two reads.
-import tui
-import tui.{Alt, Ctrl, Decoder, Event, KeyPress, Mouse, MouseEvent, Paste, Shift}
-import tui.{BackTab, Backspace, Char, Delete, Down, End, Enter, Escape, F, Home, Insert, Left, PageDown,
+import dev.avinlang.tui as tui
+import dev.avinlang.tui.{Alt, Ctrl, Decoder, Event, KeyPress, Mouse, MouseEvent, Paste, Shift}
+import dev.avinlang.tui.{BackTab, Backspace, Char, Delete, Down, End, Enter, Escape, F, Home, Insert, Left, PageDown,
             PageUp, Right, Tab, Up}
-import tui.{Drag, Move, Press, Release, ScrollDown, ScrollLeft, ScrollRight, ScrollUp}
+import dev.avinlang.tui.{Drag, Move, Press, Release, ScrollDown, ScrollLeft, ScrollRight, ScrollUp}
 
 // Every event `text`'s bytes make, flushed at the end as after a pause.
 events(text: string) -> Vector[Event]

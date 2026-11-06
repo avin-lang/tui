@@ -1,4 +1,4 @@
-module tui
+module dev.avinlang.tui
 
 private val Esc: string = "\u{1b}"
 private val Csi: string = "\u{1b}["

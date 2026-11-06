@@ -1,4 +1,4 @@
-module tui
+module dev.avinlang.tui
 
 // A key, without the modifiers held with it.
 data Key

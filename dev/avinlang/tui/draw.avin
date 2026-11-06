@@ -1,4 +1,4 @@
-module tui
+module dev.avinlang.tui
 
 // A rectangle of cells: its left column, top row, width and height. A rectangle of no width or no
 // height holds no cell.

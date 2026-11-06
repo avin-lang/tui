@@ -2,10 +2,10 @@ module tests
 
 // The diff renderer, byte for byte: what the first frame, an unchanged frame and a changed one write;
 // cursor movement; styles in each colour mode; two-column characters; resizing.
-import tui
-import tui.{Basic, Bold, Cluster, Default, Dim, Grid, Indexed, Italic, Renderer, Reverse, Rgb, Style,
+import dev.avinlang.tui as tui
+import dev.avinlang.tui.{Basic, Bold, Cluster, Default, Dim, Grid, Indexed, Italic, Renderer, Reverse, Rgb, Style,
             Underline, cursorMove, sgr}
-import tui.{Basic16, Palette256, TrueColor}
+import dev.avinlang.tui.{Basic16, Palette256, TrueColor}
 
 val E: string = "\u{1b}["
 val Clear: string = "\u{1b}[0m\u{1b}[H\u{1b}[2J"
