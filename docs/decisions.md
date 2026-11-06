@@ -1,9 +1,10 @@
 # Decisions
 
 Each choice the library makes that its users may want to know about, why it was made and what else
-was weighed. **Proposed** ones await review.
+was weighed. All are **settled on the user's delegation 2026-11-06** (branch `core`). Review with
+the user: the width rules, and writing frames to `/dev/tty`.
 
-## Events come from a blocking `poll(timeout)` on the caller's thread — Proposed
+## Events come from a blocking `poll(timeout)` on the caller's thread
 
 `Terminal.poll(timeout)` waits on standard input with `sysl.io.wait.ready`, in slices of at most 50
 ms, looking at the resize and stop signals between slices, and answers the first event or `None`.
@@ -15,7 +16,7 @@ ms, looking at the resize and stop signals between slices, and answers the first
   receive, so the program's tick would need a second thread or a timer event); a callback per event
   (inverts the program's control flow).
 
-## Frames are written to `/dev/tty` — Proposed
+## Frames are written to `/dev/tty`
 
 The terminal is opened as a file, `/dev/tty`, and each frame is written to it and flushed.
 
@@ -26,7 +27,7 @@ The terminal is opened as a file, `/dev/tty`, and each frame is written to it an
   better long-term answer for programs that print as well as draw); writing frames to standard error
   (unbuffered, but mixes with the program's messages).
 
-## Escape is told from a sequence by a 25 ms pause — Proposed
+## Escape is told from a sequence by a 25 ms pause
 
 A lone escape byte is the Escape key when nothing follows it within 25 ms; an escape before any other
 key is that key with `Alt`. A sequence cut short is read as Escape and the keys of its bytes. A
@@ -37,7 +38,7 @@ bracketed paste waits for its end however long it takes.
 - **Alternatives:** 50–100 ms (what some editors use; Escape feels slow), or no delay (breaks
   sequences split by a slow link).
 
-## Keys: what the control bytes are — Proposed
+## Keys: what the control bytes are
 
 `0x0d` and `0x0a` are both `Enter` (the terminal's input translation may turn one into the other);
 `0x09` is `Tab`; `0x7f` is `Backspace`; `0x08` is Ctrl-h, not Backspace; `0x00` is Ctrl-Space; the
@@ -49,7 +50,7 @@ keypad modes it has no key for) are dropped.
   from arriving as keys.
 - **Alternatives:** an `Unknown(bytes)` event (a program would have to ignore it everywhere).
 
-## Ctrl-C is a key; outside signals are `Stop` events — Proposed
+## Ctrl-C is a key; outside signals are `Stop` events
 
 Raw mode turns the terminal's signal keys off, so Ctrl-C, Ctrl-\ and Ctrl-Z arrive as keys and the
 program decides. `Terminate`, `Hangup` and `Interrupt` sent from outside are watched and arrive as
@@ -60,7 +61,7 @@ program decides. `Terminate`, `Hangup` and `Interrupt` sent from outside are wat
   alternate screen is left (see the last entry).
 - **Alternatives:** keep `ISIG` on (Ctrl-C would kill the program with the screen not put back).
 
-## Character widths — Proposed
+## Character widths
 
 From the Unicode Character Database 16.0.0 (`tools/widthgen` writes `width_table.avin`):
 
@@ -80,7 +81,7 @@ From the Unicode Character Database 16.0.0 (`tools/widthgen` writes `width_table
   terminals, which draw each part; a family emoji then takes six columns); full UAX #29 grapheme
   clustering (more tables, and terminals do not follow it either).
 
-## The diff renderer — Proposed
+## The diff renderer
 
 - A frame starts where the last left the terminal and ends with the style reset, so text written
   between frames and the shell afterwards start from the terminal's own colours.
@@ -97,7 +98,7 @@ From the Unicode Character Database 16.0.0 (`tools/widthgen` writes `width_table
 - **Alternatives:** redrawing whole lines that changed (simpler, more bytes); scroll regions for
   moved content (not needed by the programs this serves yet).
 
-## Colours — Proposed
+## Colours
 
 Colours are matched in RGB by squared distance against xterm's default palette. In 256 colours an RGB
 colour is the nearer of the cube's colour (each channel to its nearest level) and the nearest grey.
@@ -108,7 +109,7 @@ consulted: a full-screen program's colours are part of what it draws.
 - **Alternatives:** a perceptual distance (CIELAB; more code for differences few see in a terminal);
   reading `terminfo` (a C library and a database for what two variables answer).
 
-## The table keeps no rows — Proposed
+## The table keeps no rows
 
 `Table` holds the columns, the selection and the scroll; the rows are passed to each `draw`.
 
@@ -116,7 +117,7 @@ consulted: a full-screen program's colours are part of what it draws.
   copy.
 - **Alternatives:** a table holding its rows with `setRows` (two copies of the data to keep in step).
 
-## The terminal is put back by `close`, and a trap cannot — Proposed
+## The terminal is put back by `close`, and a trap cannot
 
 `close` and `Terminal.use` restore everything. A program that ends without closing gets the terminal
 mode back from Sysl's exit hook but stays on the alternate screen with the mouse reporting; a trap
