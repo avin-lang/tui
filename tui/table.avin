@@ -1,0 +1,77 @@
+module tui
+
+// A column of a table: its heading, its width in columns, and where its text sits: -1 left, 0
+// centred, 1 right. A width of 0 takes what the columns of fixed width leave, shared among every
+// column of width 0.
+data Column(title: string, width: int, align: int = -1)
+
+// A table of rows of text under a line of headings, one row selected, scrolled to keep the selected
+// row in view. It keeps only the selection and the scroll: the rows are given to `draw` each frame,
+// so the program owns its data and the table never holds a stale copy of it.
+class Table(val columns: Vector[Column])
+    // The selected row, counted from 0; -1 where there are no rows.
+    var selected = 0
+    // The first row shown.
+    var offset = 0
+    // The style of the headings, of the rows, and of the selected row.
+    var headerStyle: Style = Style.plain().with(Bold | Reverse)
+    var rowStyle: Style = Style.plain()
+    var selectedStyle: Style = Style.plain().with(Reverse)
+
+    // Moves the selection by `n` rows, held to the rows there are, `count` of them.
+    moveBy(n: int, count: int)
+        select(selected + n, count)
+
+    // Selects row `i`, held to the rows there are.
+    select(i: int, count: int)
+        selected = if count <= 0 then -1 else if i < 0 then 0 else if i >= count then count - 1 else i
+
+    // The widths the columns take in `width` columns, with one blank column between two.
+    widths(width: int) -> Vector[int]
+        val n = columns.length()
+        if n == 0 then return Vector[int]()
+        var fixed = 0
+        var flexible = 0
+        for c in columns
+            if c.width > 0 then fixed += c.width else flexible += 1
+        val spare = maxOf(width - fixed - (n - 1), 0)
+        val out = Vector.newBuilder[int]()
+        var given = 0
+        for c in columns
+            if c.width > 0
+                out.addOne(c.width)
+            else
+                given += 1
+                // The last flexible column takes what dividing leaves over.
+                out.addOne(if given == flexible then spare - (spare / flexible) * (flexible - 1) else spare / flexible)
+        out.result()
+
+    // Draws the headings on the first row of `r` and as many rows as fit under them, scrolling first
+    // so the selected row is shown. A row with fewer cells than there are columns leaves the rest
+    // blank; cells past the last column are not drawn.
+    draw(g: Grid, r: Rect, rows: Vector[Vector[string]])
+        if r.isEmpty() then return
+        val count = rows.length()
+        select(selected, count)
+        val visible = maxOf(r.h - 1, 0)
+        if selected >= 0
+            if selected < offset then offset = selected
+            if visible > 0 && selected >= offset + visible then offset = selected - visible + 1
+        if offset > maxOf(count - visible, 0) then offset = maxOf(count - visible, 0)
+        if offset < 0 then offset = 0
+        val ws = widths(r.w)
+        line(g, r, r.y, columns.map(c -> c.title), ws, headerStyle)
+        for k in 0 ..< visible
+            val i = offset + k
+            val style = if i == selected then selectedStyle else rowStyle
+            if i < count then line(g, r, r.y + 1 + k, rows(i), ws, style)
+            else g.fill(r.x, r.y + 1 + k, r.w, 1, rowStyle)
+
+    // Draws one line of cells across `r` at row `y`.
+    private line(g: Grid, r: Rect, y: int, cells: Vector[string], ws: Vector[int], style: Style)
+        g.fill(r.x, y, r.w, 1, style)
+        var x = r.x
+        for j in 0 ..< columns.length()
+            val text = if j < cells.length() then cells(j) else ""
+            g.textIn(x, y, ws(j), text, style, columns(j).align, r)
+            x += ws(j) + 1
