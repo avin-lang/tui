@@ -105,7 +105,7 @@ impl Grid
     meter(x: int, y: int, width: int, fraction: real, filled: Style, empty: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue))
         if width <= 0 then return
         // A NaN is no comparison's answer, so it is held to 0 with the negatives.
-        val f = if !(fraction > 0.0) then 0.0 else if fraction > 1.0 then 1.0 else fraction
+        val f = if fraction.isNaN() || fraction <= 0.0 then 0.0 else if fraction > 1.0 then 1.0 else fraction
         val units = int(f * real(width * 8) + 0.5)
         val full = units / 8
         val part = units % 8

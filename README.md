@@ -2,7 +2,7 @@
 
 Terminal user interfaces in Avin: raw mode and the alternate screen, a grid of cells drawn by
 difference, keys, mouse and paste read from raw bytes, and a few small widgets. Everything is Avin
-code except six calls into Sysl's library: whether standard input is a terminal, its size, raw mode
+code except six calls into Sysl's library: whether a descriptor is a terminal, its size, raw mode
 on and off, waiting for input with a time limit, and reading it.
 
 The module is `dev.avinlang.tui`.
@@ -77,8 +77,10 @@ mouse and paste off and restores the terminal's mode. A `Terminate`, `Hangup` or
 the program arrives as a `Stop` event, so the program closes the terminal as on any other way out.
 In raw mode Ctrl-C is a key like any other.
 
-A program that ends without closing gets its terminal mode back, but stays on the alternate screen;
-one that traps gets neither, and `reset` puts the terminal right.
+A program that ends with the terminal open, by `exit` or by a trap, gets all of it back: `open`
+registers an exit hook that writes the leave sequence and restores the mode, and `close` cancels it.
+Frames go to standard output, so `open` fails where standard input or standard output is not a
+terminal.
 
 ## Tests
 

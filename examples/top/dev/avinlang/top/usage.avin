@@ -78,6 +78,6 @@ private held(s: CpuShare) -> CpuShare
     val u = clamp01(s.user)
     CpuShare(u, minOfReal(clamp01(s.system), 1.0 - u))
 
-private clamp01(x: real) -> real = if !(x > 0.0) then 0.0 else if x > 1.0 then 1.0 else x
+private clamp01(x: real) -> real = if x.isNaN() || x <= 0.0 then 0.0 else if x > 1.0 then 1.0 else x
 private minOfReal(a: real, b: real) -> real = if a < b then a else b
 private maxOf(a: long, b: long) -> long = if a > b then a else b

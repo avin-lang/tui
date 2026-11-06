@@ -2,7 +2,7 @@
 
 Each choice the library makes that its users may want to know about, why it was made and what else
 was weighed. All are **settled on the user's delegation 2026-11-06** (branch `core`). Review with
-the user: the width rules, and writing frames to `/dev/tty`.
+the user: the width rules, and frames on standard output, refused when it is not a terminal.
 
 ## Events come from a blocking `poll(timeout)` on the caller's thread
 
@@ -16,16 +16,18 @@ ms, looking at the resize and stop signals between slices, and answers the first
   receive, so the program's tick would need a second thread or a timer event); a callback per event
   (inverts the program's control flow).
 
-## Frames are written to `/dev/tty`
+## Frames are written to standard output, with `flush()`
 
-The terminal is opened as a file, `/dev/tty`, and each frame is written to it and flushed.
+**Supersedes** the earlier decision to write frames to `/dev/tty`. Each frame is `print`ed and
+`flush()`ed; input is still read from standard input.
 
-- **Why:** a frame must reach the terminal when it is presented, not when the program ends, and
-  Avin's standard output is buffered with no flush. Writing to the controlling terminal also leaves
-  standard output free: a program run as `tool | less` still draws on the terminal.
-- **Alternatives:** a `flush` on `StandardOutput` in Avin's library (needs a library change; the
-  better long-term answer for programs that print as well as draw); writing frames to standard error
-  (unbuffered, but mixes with the program's messages).
+- **Why:** Avin now flushes on request, so the reason for opening `/dev/tty` is gone, and one stream
+  is simpler: no file to open or close, and the exit hook can write the restore sequence with the same call.
+- **Redirected output:** `open` fails with "standard output is not a terminal" when standard output is
+  not a tty (`isTty`-style check on descriptor 1), as it does for standard input. Escape sequences in a
+  file or pipe are never wanted, and drawing on a terminal behind the program's back would surprise.
+- **Alternatives:** keep `/dev/tty` (lets `tool | less` still draw, but needs a second file and
+  ignores that the program's own printing goes elsewhere); draw regardless of what stdout is.
 
 ## Escape is told from a sequence by a 25 ms pause
 
@@ -117,15 +119,16 @@ consulted: a full-screen program's colours are part of what it draws.
   copy.
 - **Alternatives:** a table holding its rows with `setRows` (two copies of the data to keep in step).
 
-## The terminal is put back by `close`, and a trap cannot
+## The terminal is put back by `close`, and by an exit hook when the program ends
 
-`close` and `Terminal.use` restore everything. A program that ends without closing gets the terminal
-mode back from Sysl's exit hook but stays on the alternate screen with the mouse reporting; a trap
-restores nothing.
+`open` registers `process.onExit` with a body that holds only the leave sequence (a string, so
+`@sendable`): it writes it, flushes and calls Sysl's cooked-mode restore, which keeps the saved mode
+itself. `close` cancels the hook and does the same. `exit` and a trap (after its message) restore the
+terminal; checked in a pty: the output ends with the leave sequence and `stty -a` shows `icanon echo`.
 
-- **Why:** Avin has no way for a library to run code when the program exits or traps.
-- **Alternatives:** an exit hook in Avin's library, run on `exit` and after a trap's message (would
-  let `open` register the restore, as Sysl's `sysl.tty` does for the mode).
+- **Why:** the exit hook is run however the program ends, so nothing is left on the alternate screen
+  with the mouse reporting on. The saved mode needed no capture, so there was no gap to report.
+- **Alternatives:** leave it to the program (what it did before the hook existed).
 
 ## `examples/top` reads the system through commands, behind a `Source` trait
 

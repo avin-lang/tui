@@ -5,10 +5,9 @@ module dev.avinlang.tui
 // descriptor is a terminal, its size, raw mode on and off, waiting for input with a time limit, and
 // reading it.
 
-import avin.fs
-import avin.fs.File
 import avin.io.IoError
 import avin.process
+import avin.process.ExitHook
 import avin.signal
 import avin.signal.Watch
 import avin.time
@@ -67,6 +66,7 @@ private class FdReader
 private fdReader(fd: int) -> FdReader
 
 private val InputFd: int = 0
+private val OutputFd: int = 1
 
 // How long the rest of an escape sequence may take to follow its escape byte before the escape is
 // taken as the Escape key.
@@ -124,7 +124,7 @@ detectColorMode(colorTerm: Option[string], term: Option[string]) -> ColorMode
 // Keys arrive with Ctrl-C as a key like any other, raw mode having turned the terminal's signals off,
 // so a program decides what Ctrl-C does. A `Terminate`, `Hangup` or `Interrupt` sent from outside
 // arrives as a `Stop` event, and so does the end of the input.
-class Terminal(private val out: File, val options: Options, val colorMode: ColorMode)
+class Terminal(val options: Options, val colorMode: ColorMode, private val hook: ExitHook)
     private val reader = fdReader(InputFd)
     private val decoder = Decoder()
     private val renderer = Renderer(colorMode)
@@ -147,8 +147,9 @@ class Terminal(private val out: File, val options: Options, val colorMode: Color
     present(g: Grid) -> Result[unit, IoError]
         val bytes = renderer.render(g)
         if bytes.isEmpty() then return Ok(())
-        out.writeText(bytes)?
-        out.flush()
+        print(bytes)
+        flush()
+        Ok(())
 
     // Makes the next `present` redraw everything.
     redraw() = renderer.invalidate()
@@ -183,9 +184,9 @@ class Terminal(private val out: File, val options: Options, val colorMode: Color
     close()
         if !open then return
         open = false
-        out.writeText(leaveSequence(options))
-        out.flush()
-        out.close()
+        hook.cancel()
+        print(leaveSequence(options))
+        flush()
         leaveRaw()
 
     // Asks the terminal its size.
@@ -211,22 +212,25 @@ class Terminal(private val out: File, val options: Options, val colorMode: Color
 
 object Terminal
     // Puts the terminal on standard input into raw mode and onto the alternate screen, and answers it.
-    // Fails where standard input is not a terminal, or `/dev/tty`, the terminal the program is drawn
-    // on, cannot be opened.
+    // Frames are written to standard output. Fails where standard input or standard output is not a
+    // terminal. An exit hook puts the terminal back if the program ends, by `exit` or a trap, with it
+    // open.
     open(options: Options = Options()) -> Result[Terminal, IoError]
         if !isTerminal(InputFd) then return Err(IoError.Other("standard input is not a terminal"))
-        val out = fs.openUpdate("/dev/tty")?
+        if !isTerminal(OutputFd) then return Err(IoError.Other("standard output is not a terminal"))
         if !enterRaw() then return Err(IoError.Other("the terminal cannot be put into raw mode"))
         val mode = options.colors.getOrElse(detectColorMode(process.env("COLORTERM"), process.env("TERM")))
-        val t = Terminal(out, options, mode)
+        val leave = leaveSequence(options)
+        val hook = process.onExit(() -> restoreScreen(leave))
+        val t = Terminal(options, mode, hook)
         t.measure()
-        out.writeText(enterSequence(options))?
-        out.flush()?
+        print(enterSequence(options))
+        flush()
         Ok(t)
 
     // Opens the terminal, runs `body` with it, and closes it when `body` returns, answering what
-    // `body` answered. The terminal is put back on every return; a trap inside `body` leaves it as it
-    // was, since nothing runs after a trap.
+    // `body` answered. The terminal is put back on every return, and by the exit hook on `exit` or a
+    // trap inside `body`.
     use[T](options: Options = Options(), body: (Terminal) -> T) -> Result[T, IoError]
         val t = open(options)?
         val result = body(t)
@@ -237,3 +241,10 @@ object Terminal
 private watchOrFail(sig: int) -> Watch = signal.watch(sig) match
     Ok(w) -> w
     Err(e) -> fail(s"watching signal $sig: ${e.message()}")
+
+// What the exit hook does: the leave sequence, then the terminal's mode. It holds only the sequence,
+// so it can run on any thread.
+private restoreScreen(leave: string)
+    print(leave)
+    flush()
+    leaveRaw()
