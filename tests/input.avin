@@ -104,6 +104,10 @@ altBracket()
 @test("a sequence cut short and flushed is Escape and the keys of its bytes")
 cutShort()
     assertEq(events("\u{1b}[1;"), [key(Escape), ch('['), ch('1'), ch(';')])
+    val d = Decoder()
+    d.feed([byte(0x1b), byte(0xe6)])
+    assertEq(d.next(), None)
+    assertEq(d.drain(), [key(Escape), ch('\u{fffd}')])
 
 @test("the arrows, Home and End, in CSI and SS3 forms")
 arrows()
@@ -209,7 +213,7 @@ mouseMalformed()
 @test("every sequence split between two reads at every byte decodes as it does whole")
 splits()
     val samples = ["\u{1b}[1;5C", "\u{1b}OP", "\u{1b}[<64;12;34M", "\u{1b}[200~pa\u{1b}ste\u{1b}[201~", "日😀",
-                   "\u{1b}[15;2~", "a\u{1b}[Bb", "\u{1b}\u{1b}[A"]
+                   "\u{1b}[15;2~", "a\u{1b}[Bb", "\u{1b}\u{1b}[A", "\u{1b}日", "\u{1b}[<35;1;2m"]
     for s in samples
         val whole = events(s)
         for got in splitEverywhere(s)
