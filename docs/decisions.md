@@ -156,3 +156,87 @@ sees only `Sample`s from a `Source`.
   `host_statistics64` (the real answer; needs Sysl to grow them); `top -l 2` for the total (blocks a
   second per look); `iostat` (whole percents since boot unless given an interval, which blocks).
 - **Review with the user:** the native calls Sysl would need are listed in the branch's report.
+
+## 0.2.0 widgets
+
+The decisions below are **Proposed** (branch `tui-020`), awaiting the user's review.
+
+### Mouse reporting is off unless asked for — Proposed
+
+`Options.mouse` defaults to `false`; bracketed paste stays on. `examples/hello` and `examples/top`
+ask for the mouse, since they show it.
+
+- **Why:** while a terminal reports the mouse, its own selection and copy need a modifier held, which
+  surprises anyone who did not ask for clicks; marshal's `top` already turned it off by hand. Paste
+  does not take anything from the terminal, so it stays on.
+- **Alternatives:** keep it on (the program that does not use the mouse pays for the one that does).
+
+### Splits are `Fixed`, `Fraction` and `Fill`, served in order — Proposed
+
+`splitSizes` gives fixed parts and fractions what they ask, first come first served, and shares what
+is left among the fills by weight, cut at the running total so the last fill takes the remainder.
+Margins and padding are both `Rect.shrink`/`pad`: there is no box model, only rectangles.
+
+- **Why:** one pass, predictable, and the parts add up to the whole whenever there is a fill.
+  A fraction is two integers, so `Fraction(1, 3)` is exact with no real rounding.
+- **Alternatives:** a constraint solver with `Min`/`Max` (ratatui's Cassowary; much more code for
+  layouts this size); a fraction as a `real`; percentages.
+
+### Table columns: `min` and `flex` on `Column`; dropped columns take their gap — Proposed
+
+`Column` gained `min = 0` and `flex = 1`, so every 0.1.0 table keeps its widths. When the flexible
+columns' minimums do not fit, the last flexible column with a minimum is left out (with the blank
+column before it) and the rest are tried again. Styled cells are `Span(text, style: Option[Style])`
+given to `drawSpans`; `draw` with strings wraps them. On the selected row a cell keeps its own style
+with `selectedStyle`'s attributes added.
+
+- **Why:** marshal's `top` drops its LABEL column when the screen is narrow and repaints STATE and
+  DEADLINE in colour over the plain table; both become declarations. Adding the selected attributes
+  (Reverse by default) to a cell's colours keeps the colour visible on the highlighted row.
+- **Alternatives:** a `max` per column (not needed yet); a priority per column for dropping;
+  replacing a selected cell's style with `selectedStyle` (loses the colour).
+
+### `ScrollView` is top-anchored with a follow flag — Proposed
+
+The view keeps the top line and `follow`; a draw while following shows the end; moving up stops
+following, reaching the end starts it again. Like `Table`, it holds no lines; `LogView` is the one that
+does, the last `limit` in a `Deque`, moving a non-following view up as old lines are dropped.
+
+- **Why:** while reading back, new lines must not move what is on the screen; anchoring at the top does
+  that, where counting back from the end (what marshal's `top` does) shifts on every line added.
+- **Alternatives:** an offset from the end; following only by an explicit key.
+
+### Wrapping breaks at spaces, a long word between clusters — Proposed
+
+`wrap` breaks each `\n`-separated line at spaces, keeps spaces between two words of a row and an
+indent at the start of the first row, drops them at a break, and breaks a word wider than the row
+between clusters (a two-column cluster in a width of 1 gets a row of its own). A text block that does
+not fit ends its last row with `…`.
+
+- **Why:** what a reader expects of prose in a help screen or a command line; measuring clusters keeps
+  CJK, emoji and combining marks whole.
+- **Alternatives:** Unicode line breaking (UAX #14; breaks between CJK characters too, much more
+  table); hyphenation; character wrap only (what marshal's `top` does).
+
+### Modals are a trait over a stack; Resize and Stop pass through — Proposed
+
+`Modal` has `title`, `measure`, `draw` and `handle(e) -> bool` (stays open). `ModalStack` draws each
+centred and bordered, bottom first, and gives keys, mouse and paste to the top alone; `Resize` and
+`Stop` are never taken, so the program still resizes and quits. `MessageBox` and `Confirm` are the
+two built in.
+
+- **Why:** the help screen and the kill question are the two modals marshal's `top` hand-draws; a
+  stack lets a confirm sit over a help. Passing `Stop` keeps a signal from being swallowed by a dialog.
+- **Alternatives:** one modal slot (no confirm over a help); modals returning an enum of outcomes
+  (the callback in `Confirm` keeps the trait to one bool).
+
+### Gauge segments round at cumulative boundaries, in whole cells — Proposed
+
+Each boundary is placed at the nearest cell to where the segments up to it end; what passes the
+budget is cut off. Every cell is one column: a wide character for a segment is drawn as `█`.
+Brackets take two of the given width and are left off under three columns.
+
+- **Why:** rounding each segment alone can lose or gain a cell; rounding the running total cannot.
+  Eighths of a cell (as `meter` uses) cannot show two colours meeting inside one cell.
+- **Alternatives:** eighths for the last segment only; width given without the brackets (what
+  marshal's bars take).

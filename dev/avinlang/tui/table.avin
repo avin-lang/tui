@@ -1,9 +1,11 @@
 module dev.avinlang.tui
 
 // A column of a table: its heading, its width in columns, and where its text sits: -1 left, 0
-// centred, 1 right. A width of 0 takes what the columns of fixed width leave, shared among every
-// column of width 0.
-data Column(title: string, width: int, align: int = -1)
+// centred, 1 right. A width of 0 makes it flexible: it takes a share of what the columns of fixed
+// width leave, in proportion to its `flex` weight, after every flexible column has been given its
+// `min`. A flexible column whose `min` there is no room for is left out, with the blank column before
+// it; the columns after it are dropped first.
+data Column(title: string, width: int, align: int = -1, min: int = 0, flex: int = 1)
 
 // A table of rows of text under a line of headings, one row selected, scrolled to keep the selected
 // row in view. It keeps only the selection and the scroll: the rows are given to `draw` each frame,
@@ -26,52 +28,101 @@ class Table(val columns: Vector[Column])
     select(i: int, count: int)
         selected = if count <= 0 then -1 else if i < 0 then 0 else if i >= count then count - 1 else i
 
-    // The widths the columns take in `width` columns, with one blank column between two.
-    widths(width: int) -> Vector[int]
+    // Whether the first row of the rectangle drawn in holds the headings.
+    var header = true
+
+    // The widths the columns take in `width` columns, with one blank column between two; 0 for a
+    // column left out.
+    widths(width: int) -> Vector[int] = layout(width).map(w -> maxOf(w, 0))
+
+    // The widths, -1 for a flexible column left out for want of room for its `min`.
+    private layout(width: int) -> Vector[int]
         val n = columns.length()
         if n == 0 then return Vector[int]()
+        val shown = Array.fill(n, true)
         var fixed = 0
-        var flexible = 0
         for c in columns
-            if c.width > 0 then fixed += c.width else flexible += 1
-        val spare = maxOf(width - fixed - (n - 1), 0)
+            if c.width > 0 then fixed += c.width
+        var spare = 0
+        var weights = 0
+        loop
+            var active = 0
+            var mins = 0
+            weights = 0
+            var last = -1
+            for j in 0 ..< n
+                if shown(j)
+                    active += 1
+                    val c = columns(j)
+                    if c.width <= 0
+                        mins += maxOf(c.min, 0)
+                        weights += maxOf(c.flex, 0)
+                        if c.min > 0 then last = j
+            spare = maxOf(width - fixed - (active - 1), 0)
+            if mins <= spare || last < 0 then break
+            shown(last) = false
+        // What the minimums leave is shared by weight, the last weighted column taking what dividing
+        // leaves over.
+        var rest = spare
+        for j in 0 ..< n
+            if shown(j) && columns(j).width <= 0 then rest -= maxOf(columns(j).min, 0)
+        rest = maxOf(rest, 0)
         val out = Vector.newBuilder[int]()
+        var seen = 0
         var given = 0
-        for c in columns
+        for j in 0 ..< n
+            val c = columns(j)
             if c.width > 0
                 out.addOne(c.width)
+            else if !shown(j)
+                out.addOne(-1)
             else
-                given += 1
-                // The last flexible column takes what dividing leaves over.
-                out.addOne(if given == flexible then spare - (spare / flexible) * (flexible - 1) else spare / flexible)
+                val w = maxOf(c.flex, 0)
+                seen += w
+                val share = if weights == 0 || w == 0 then 0 else if seen == weights then rest - given else rest * w / weights
+                given += share
+                out.addOne(maxOf(c.min, 0) + share)
         out.result()
 
     // Draws the headings on the first row of `r` and as many rows as fit under them, scrolling first
     // so the selected row is shown. A row with fewer cells than there are columns leaves the rest
     // blank; cells past the last column are not drawn.
-    draw(g: Grid, r: Rect, rows: Vector[Vector[string]])
+    draw(g: Grid, r: Rect, rows: Vector[Vector[string]]) =
+        drawSpans(g, r, rows.map(row -> row.map(t -> Span(t))))
+
+    // Draws as `draw` does, each cell in its own style where it has one. On the selected row a cell
+    // with its own style is drawn in it with the attributes of `selectedStyle` added, so the default
+    // selection reverses the cell's own colours.
+    drawSpans(g: Grid, r: Rect, rows: Vector[Vector[Span]])
         if r.isEmpty() then return
         val count = rows.length()
         select(selected, count)
-        val visible = maxOf(r.h - 1, 0)
+        val top = if header then 1 else 0
+        val visible = maxOf(r.h - top, 0)
         if selected >= 0
             if selected < offset then offset = selected
             if visible > 0 && selected >= offset + visible then offset = selected - visible + 1
         if offset > maxOf(count - visible, 0) then offset = maxOf(count - visible, 0)
         if offset < 0 then offset = 0
-        val ws = widths(r.w)
-        line(g, r, r.y, columns.map(c -> c.title), ws, headerStyle)
+        val ws = layout(r.w)
+        if header then line(g, r, r.y, columns.map(c -> Span(c.title)), ws, headerStyle, 0)
         for k in 0 ..< visible
             val i = offset + k
-            val style = if i == selected then selectedStyle else rowStyle
-            if i < count then line(g, r, r.y + 1 + k, rows(i), ws, style)
-            else g.fill(r.x, r.y + 1 + k, r.w, 1, rowStyle)
+            val y = r.y + top + k
+            if i >= count then g.fill(r.x, y, r.w, 1, rowStyle)
+            else if i == selected then line(g, r, y, rows(i), ws, selectedStyle, selectedStyle.attrs)
+            else line(g, r, y, rows(i), ws, rowStyle, 0)
 
-    // Draws one line of cells across `r` at row `y`.
-    private line(g: Grid, r: Rect, y: int, cells: Vector[string], ws: Vector[int], style: Style)
+    // Draws one line of cells across `r` at row `y`, the cells with no style in `style` and those
+    // with one in it with `attrs` added.
+    private line(g: Grid, r: Rect, y: int, cells: Vector[Span], ws: Vector[int], style: Style, attrs: int)
         g.fill(r.x, y, r.w, 1, style)
         var x = r.x
         for j in 0 ..< columns.length()
-            val text = if j < cells.length() then cells(j) else ""
-            g.textIn(x, y, ws(j), text, style, columns(j).align, r)
+            if ws(j) < 0 then continue
+            val cell = if j < cells.length() then cells(j) else Span("")
+            val s = cell.style match
+                Some(own) -> own.with(attrs)
+                None -> style
+            g.textIn(x, y, ws(j), cell.text, s, columns(j).align, r)
             x += ws(j) + 1

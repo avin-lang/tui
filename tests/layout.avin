@@ -1,0 +1,71 @@
+module tests
+
+// Splitting rectangles into rows and columns by fixed sizes, fractions and fills, and taking margins
+// off them.
+import dev.avinlang.tui.{Fill, Fixed, Fraction, Rect, splitSizes}
+
+@test("fixed parts take their size and a fill takes the rest")
+splitFixedAndFill()
+    assertEq(splitSizes(10, [Fixed(3), Fill(), Fixed(2)]), [3, 5, 2])
+    assertEq(splitSizes(10, [Fixed(4), Fixed(6)]), [4, 6])
+    assertEq(splitSizes(10, [Fixed(4)]), [4])
+
+@test("a fraction is of the whole, rounded down, and held to it")
+splitFractions()
+    assertEq(splitSizes(10, [Fraction(1, 2), Fill()]), [5, 5])
+    assertEq(splitSizes(10, [Fraction(1, 3), Fill()]), [3, 7])
+    assertEq(splitSizes(10, [Fraction(3, 2)]), [10])
+    assertEq(splitSizes(10, [Fraction(1, 0), Fraction(-1, 2), Fill()]), [0, 0, 10])
+
+@test("fills share by weight, the last taking what dividing leaves")
+splitWeights()
+    assertEq(splitSizes(10, [Fill(1), Fill(2)]), [3, 7])
+    assertEq(splitSizes(11, [Fill(), Fill(), Fill()]), [3, 4, 4])
+    assertEq(splitSizes(4, [Fill(0)]), [0])
+    assertEq(splitSizes(4, [Fill(0), Fill()]), [0, 4])
+
+@test("parts that ask for more than there is are served in order and the fills get nothing")
+splitOverflow()
+    assertEq(splitSizes(5, [Fixed(3), Fixed(4), Fill()]), [3, 2, 0])
+    assertEq(splitSizes(5, [Fixed(5), Fill()]), [5, 0])
+    assertEq(splitSizes(5, [Fixed(-2), Fill()]), [0, 5])
+
+@test("gaps come out of the whole first, and nothing is left where they take it all")
+splitGaps()
+    assertEq(splitSizes(10, [Fill(), Fill()], 2), [4, 4])
+    assertEq(splitSizes(3, [Fill(), Fill()], 5), [0, 0])
+    assertEq(splitSizes(10, [Fill()], 3), [10])
+    assertEq(splitSizes(10, [Fill(), Fill()], -1), [5, 5])
+
+@test("a whole of no cells or one cell, and no parts at all")
+splitTiny()
+    assertEq(splitSizes(0, [Fixed(1), Fill()]), [0, 0])
+    assertEq(splitSizes(1, [Fill(), Fill()]), [0, 1])
+    assertEq(splitSizes(-3, [Fill()]), [0])
+    assertEq(splitSizes(10, []), [])
+
+@test("rows stack top to bottom and columns run left to right, gaps between")
+rectSplits()
+    val r = Rect(0, 0, 5, 10)
+    assertEq(r.rows([Fill(), Fill()], 2), [Rect(0, 0, 5, 4), Rect(0, 6, 5, 4)])
+    assertEq(r.rows([Fixed(1), Fill(), Fixed(1)]), [Rect(0, 0, 5, 1), Rect(0, 1, 5, 8), Rect(0, 9, 5, 1)])
+    assertEq(Rect(2, 1, 10, 3).columns([Fixed(4), Fill()]), [Rect(2, 1, 4, 3), Rect(6, 1, 6, 3)])
+    assertEq(Rect(2, 1, 10, 3).columns([Fill(), Fill()], 1), [Rect(2, 1, 4, 3), Rect(7, 1, 5, 3)])
+    assertEq(Rect(0, 0, 0, 0).columns([Fill(), Fixed(2)]), [Rect(0, 0, 0, 0), Rect(0, 0, 0, 0)])
+
+@test("margins and padding take cells off the sides, never below nothing")
+rectMargins()
+    assertEq(Rect(0, 0, 10, 5).shrink(1, 2, 0, 3), Rect(3, 1, 5, 4))
+    assertEq(Rect(0, 0, 10, 5).pad(1, 1), Rect(1, 1, 8, 3))
+    assertEq(Rect(0, 0, 2, 2).shrink(1, 1, 1, 1), Rect(1, 1, 0, 0))
+    assertEq(Rect(0, 0, 2, 2).pad(5, 5), Rect(5, 5, 0, 0))
+    assertEq(Rect(4, 4, 3, 3).pad(0, 0), Rect(4, 4, 3, 3))
+
+@test("a centred rectangle sits in the middle, the odd cell to the right and down, cut to fit")
+rectCentered()
+    val r = Rect(0, 0, 10, 5)
+    assertEq(r.centered(4, 3), Rect(3, 1, 4, 3))
+    assertEq(r.centered(3, 2), Rect(3, 1, 3, 2))
+    assertEq(r.centered(20, 20), Rect(0, 0, 10, 5))
+    assertEq(r.centered(-1, 0), Rect(5, 2, 0, 0))
+    assertEq(Rect(2, 3, 1, 1).centered(1, 1), Rect(2, 3, 1, 1))

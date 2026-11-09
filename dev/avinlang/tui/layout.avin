@@ -1,0 +1,94 @@
+module dev.avinlang.tui
+
+// How much of a rectangle one part of a split takes.
+//
+// `Fixed(n)` is `n` cells. `Fraction(num, den)` is `num / den` of the whole being split, rounded
+// down. `Fill(weight)` shares what the fixed parts and the fractions leave with the other fills, in
+// proportion to the weights; the last fill takes what dividing leaves over, so the parts always add up
+// to the whole when there is a fill. Where the fixed parts and the fractions ask for more than there
+// is, they are given what is left in order, first come first served, and the fills get nothing.
+data Size
+    Fixed(n: int)
+    Fraction(num: int, den: int)
+    Fill(weight: int = 1)
+
+// The cells each of `sizes` takes out of `total`, with `gap` cells between two parts. A negative
+// size, weight or gap counts as 0, and so does a fraction over a denominator of 0 or less.
+splitSizes(total: int, sizes: Vector[Size], gap: int = 0) -> Vector[int]
+    val n = sizes.length()
+    if n == 0 then return Vector[int]()
+    val gaps = maxOf(gap, 0) * (n - 1)
+    var left = maxOf(total - gaps, 0)
+    val whole = left
+    val out = Array.fill(n, 0)
+    var weights = 0
+    var i = 0
+    for s in sizes
+        val want = wanted(s, whole)
+        if want >= 0
+            out(i) = minOf(want, left)
+            left -= out(i)
+        else
+            weights += weightOf(s)
+        i += 1
+    if weights == 0 then return out.toVector()
+    val spare = left
+    var given = 0
+    var seen = 0
+    i = 0
+    for s in sizes
+        if wanted(s, whole) < 0
+            seen += weightOf(s)
+            // Shares are cut at the running total, so the last fill takes what rounding leaves.
+            val upTo = spare * seen / weights
+            out(i) = upTo - given
+            given = upTo
+        i += 1
+    out.toVector()
+
+// The cells a fixed part or a fraction asks for, or -1 for a fill.
+private wanted(s: Size, whole: int) -> int
+wanted(Fixed(n), _) = maxOf(n, 0)
+wanted(Fraction(num, den), whole) = if den <= 0 || num <= 0 then 0 else minOf(int(long(whole) * long(num) / long(den)), whole)
+wanted(Fill(_), _) = -1
+
+private weightOf(s: Size) -> int
+weightOf(Fill(w)) = maxOf(w, 0)
+weightOf(_) = 0
+
+impl Rect
+    // It cut into rows, top to bottom, each as high as `sizes` gives out of its height, with `gap`
+    // rows between two.
+    rows(sizes: Vector[Size], gap: int = 0) -> Vector[Rect]
+        val hs = splitSizes(h, sizes, gap)
+        val out = Vector.newBuilder[Rect]()
+        var top = y
+        for k in hs
+            out.addOne(Rect(x, top, maxOf(w, 0), k))
+            top += k + maxOf(gap, 0)
+        out.result()
+
+    // It cut into columns, left to right, each as wide as `sizes` gives out of its width, with `gap`
+    // columns between two.
+    columns(sizes: Vector[Size], gap: int = 0) -> Vector[Rect]
+        val ws = splitSizes(w, sizes, gap)
+        val out = Vector.newBuilder[Rect]()
+        var left = x
+        for k in ws
+            out.addOne(Rect(left, y, k, maxOf(h, 0)))
+            left += k + maxOf(gap, 0)
+        out.result()
+
+    // It with `top`, `right`, `bottom` and `left` cells taken off those sides: a margin around
+    // something drawn in it, or the padding inside a box. It never goes below no width or height.
+    shrink(top: int, right: int, bottom: int, left: int) -> Rect =
+        Rect(x + left, y + top, maxOf(w - left - right, 0), maxOf(h - top - bottom, 0))
+
+    // It with `dx` columns off the left and the right and `dy` rows off the top and the bottom.
+    pad(dx: int, dy: int) -> Rect = shrink(dy, dx, dy, dx)
+
+    // A rectangle `cw` by `ch` centred in it, cut to fit it; the odd cell left over goes right and down.
+    centered(cw: int, ch: int) -> Rect
+        val ww = minOf(maxOf(cw, 0), maxOf(w, 0))
+        val hh = minOf(maxOf(ch, 0), maxOf(h, 0))
+        Rect(x + (w - ww) / 2, y + (h - hh) / 2, ww, hh)

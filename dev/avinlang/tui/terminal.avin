@@ -77,8 +77,9 @@ private val SignalSlice: avin.time.Duration = time.millis(50)
 
 // What a terminal is opened with.
 data Options(
-    // Report the mouse: presses, releases, drags and the wheel.
-    mouse: bool = true,
+    // Report the mouse: presses, releases, drags and the wheel. Off unless asked for, because while it
+    // is on the terminal's own selection and copy need a modifier held.
+    mouse: bool = false,
     // Bracket pasted text, so a paste arrives as one `Paste` event rather than as keys.
     paste: bool = true,
     // The colours to draw in; `None` asks the environment (`detectColorMode`).

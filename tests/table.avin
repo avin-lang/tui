@@ -1,0 +1,87 @@
+module tests
+
+// The table's flexible columns with minimums and weights, cells in their own styles, the header
+// turned off, a selection out of range, and elision of wide text.
+import dev.avinlang.tui.{Column, Green, Grid, Rect, Red, Reverse, Span, Style, Table}
+
+minTable() -> Table = Table([Column("a", 0, min = 5), Column("b", 4), Column("c", 0, min = 3, flex = 2)])
+
+@test("flexible columns get their minimums first and share the rest by weight")
+tableMinFlex()
+    assertEq(minTable().widths(20), [7, 4, 7])
+    assertEq(minTable().widths(21), [7, 4, 8])
+    assertEq(Table([Column("a", 0, min = 3, flex = 0), Column("b", 0)]).widths(10), [3, 6])
+    assertEq(Table([Column("a", 0, flex = 0)]).widths(10), [0])
+
+@test("a flexible column with no room for its minimum is left out, the last first")
+tableDropsColumns()
+    assertEq(minTable().widths(10), [5, 4, 0])
+    assertEq(minTable().widths(8), [0, 4, 0])
+    val g = Grid(10, 2)
+    minTable().draw(g, g.area(), [["x", "y", "z"]])
+    assertEq(rows(g), ["a     b   ", "x     y   "])
+
+@test("cells in their own styles, reversed on the selected row")
+tableStyledCells()
+    val g = Grid(8, 3)
+    val t = Table([Column("n", 3), Column("s", 0)])
+    t.select(1, 2)
+    t.drawSpans(g, g.area(), [
+        [Span("1"), Span("ok", Some(Style.fg(Green)))],
+        [Span("2"), Span("bad", Some(Style.fg(Red)))]
+    ])
+    assertEq(rows(g), ["n   s   ", "1   ok  ", "2   bad "])
+    assertEq(g(0, 1).style, t.rowStyle)
+    assertEq(g(4, 1).style, Style.fg(Green))
+    assertEq(g(7, 1).style, Style.fg(Green))
+    assertEq(g(0, 2).style, t.selectedStyle)
+    assertEq(g(4, 2).style, Style.fg(Red).with(Reverse))
+    assertEq(g(3, 2).style, t.selectedStyle)
+
+@test("a table with no header uses every row for rows")
+tableNoHeader()
+    val g = Grid(10, 2)
+    val t = table()
+    t.header = false
+    t.draw(g, g.area(), numbered(2))
+    assertEq(rows(g), ["row0     0", "row1     1"])
+    t.select(5, 6)
+    t.draw(g, g.area(), numbered(6))
+    assertEq(t.offset, 4)
+
+@test("a selection out of range is held to the rows when drawn")
+tableSelectionOutOfRange()
+    val g = Grid(10, 3)
+    val t = table()
+    t.selected = 50
+    t.draw(g, g.area(), numbered(3))
+    assertEq(t.selected, 2)
+    assertEq(t.offset, 1)
+    assertEq(rows(g), ["name     n", "row1     1", "row2     2"])
+    assertEq(g(0, 2).style, t.selectedStyle)
+    t.selected = -5
+    t.draw(g, g.area(), numbered(3))
+    assertEq(t.selected, 0)
+    assertEq(t.offset, 0)
+
+@test("wide text is cut whole characters at a time before the ellipsis, either alignment")
+tableWideElision()
+    val g = Grid(4, 2)
+    Table([Column("n", 0)]).draw(g, g.area(), [["日本語x"]])
+    assertEq(g.rowText(1), "日… ")
+    val h = Grid(4, 2)
+    Table([Column("n", 0, 1)]).draw(h, h.area(), [["日本語x"]])
+    assertEq(h.rowText(1), " 日…")
+    val e = Grid(4, 2)
+    Table([Column("n", 0)]).draw(e, e.area(), [["e\u{301}e\u{301}"]])
+    assertEq(e(0, 1).text, "e\u{301}")
+
+@test("a table one column wide or with no columns draws without trapping")
+tableNarrow()
+    val g = Grid(1, 2)
+    table().draw(g, g.area(), numbered(3))
+    assertEq(rows(g), [" ", " "])
+    val h = Grid(4, 2)
+    Table([]).draw(h, h.area(), [["x"]])
+    assertEq(rows(h), ["    ", "    "])
+    Table([Column("a", 0)]).draw(h, Rect(0, 0, 0, 2), [["x"]])

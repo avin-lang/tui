@@ -1,0 +1,57 @@
+module dev.avinlang.tui
+
+// One part of a gauge: how much of the budget it takes, and the character and style its cells are
+// drawn in.
+data Segment(amount: real, style: Style, ch: char = '█')
+
+// The cells each segment fills out of `width`, for `segments` laid end to end against `budget`.
+//
+// Each boundary is placed at the nearest cell to where the segments up to it end, so the cells add up
+// as the amounts do and no rounding is lost or counted twice; what passes the budget is cut off at the
+// end. A negative amount, or one that is not a number, takes no cells; so does everything when the
+// budget is 0 or less.
+gaugeCells(width: int, segments: Vector[Segment], budget: real) -> Vector[int]
+    val out = Vector.newBuilder[int]()
+    val w = maxOf(width, 0)
+    var sum = 0.0
+    var before = 0
+    for s in segments
+        if s.amount > 0.0 then sum += s.amount
+        val upTo = if budget > 0.0 && !budget.isNaN() then cellsAt(sum / budget, w) else 0
+        out.addOne(upTo - before)
+        before = upTo
+    out.result()
+
+// The nearest cell of `width` to `fraction` of it, held to the cells there are.
+private cellsAt(fraction: real, width: int) -> int
+    if fraction.isNaN() || fraction <= 0.0 then return 0
+    if fraction >= 1.0 then return width
+    int(fraction * real(width) + 0.5)
+
+impl Grid
+    // Draws a gauge from column `x` of row `y`, `width` columns in all: the segments one after another,
+    // each as many cells as its share of `budget` (see `gaugeCells`), the cells after them `rest` in
+    // `empty`. With `brackets` the gauge is drawn between `[` and `]` in `frame`, which take two of its
+    // columns; a gauge under three columns wide gets none. A character not one column wide, for a
+    // segment or for `rest`, is drawn as `█` or `·`, so every cell of the gauge is one column. Answers
+    // the column after it.
+    gauge(x: int, y: int, width: int, segments: Vector[Segment], budget: real, empty: Style = Style.fg(BrightBlack), rest: char = '·', brackets: bool = true, frame: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)) -> int
+        if width <= 0 then return x
+        val c = clip.intersect(area())
+        val framed = brackets && width >= 3
+        val inner = if framed then width - 2 else width
+        val left = if framed then x + 1 else x
+        if framed
+            cell(x, y, '[', frame, c)
+            cell(x + width - 1, y, ']', frame, c)
+        var col = left
+        for (s, n) in segments.zip(gaugeCells(inner, segments, budget))
+            val ch = if charWidth(s.ch) == 1 && !s.ch.isControl() then s.ch else '█'
+            for _ in 0 ..< n
+                cell(col, y, ch, s.style, c)
+                col += 1
+        val restCh = if charWidth(rest) == 1 && !rest.isControl() then rest else '·'
+        while col < left + inner
+            cell(col, y, restCh, empty, c)
+            col += 1
+        x + width

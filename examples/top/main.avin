@@ -7,7 +7,7 @@ import avin.time
 import dev.avinlang.top.{App, CommandSource, Kill, Quit, Sample, Source, Stay, Usage, usage}
 import dev.avinlang.tui.{Options, Terminal}
 
-main() -> int = Terminal.use(Options(), run) match
+main() -> int = Terminal.use(Options(mouse = true), run) match
     Ok(()) -> 0
     Err(e) ->
         eprintln(s"top: ${e.message()}")

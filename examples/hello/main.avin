@@ -5,7 +5,7 @@ import dev.avinlang.tui
 import dev.avinlang.tui.{Bold, Char, Ctrl, Cyan, Event, Green, Grid, KeyPress, Mouse, Options, Paste,
                          Rect, Resize, Rounded, Stop, Style, Terminal, Yellow}
 
-main() -> int = Terminal.use(Options(), run) match
+main() -> int = Terminal.use(Options(mouse = true), run) match
     Ok(()) -> 0
     Err(e) ->
         eprintln(s"hello: ${e.message()}")

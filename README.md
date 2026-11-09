@@ -9,7 +9,7 @@ The module is `dev.avinlang.tui`.
 
 ```hocon
 dependencies {
-  tui { git = "github.com/avin-lang/tui", version = "0.1.0" }
+  tui { git = "github.com/avin-lang/tui", version = "0.2.0" }
 }
 ```
 
@@ -60,15 +60,108 @@ avin test examples/top
 
 | | |
 |---|---|
-| `Terminal` | `open` and `close`, or `use(options, body)`; `frame()`, `present(grid)`, `poll(timeout)`, `width()`, `height()`, `redraw()`. Raw mode, the alternate screen, the cursor hidden, the mouse and bracketed paste on, all put back by `close`. |
+| `Terminal` | `open` and `close`, or `use(options, body)`; `frame()`, `present(grid)`, `poll(timeout)`, `width()`, `height()`, `redraw()`. Raw mode, the alternate screen, the cursor hidden, bracketed paste on and the mouse when asked for, all put back by `close`. |
 | `Event` | `KeyPress(key, mods)`, `Mouse(MouseEvent)`, `Paste(text)`, `Resize(cols, rows)`, `Stop(signal)`. |
 | `Key` | `Char(c)`, `Enter`, `Tab`, `BackTab`, `Backspace`, `Escape`, the arrows, `Home`, `End`, `PageUp`, `PageDown`, `Insert`, `Delete`, `F(n)`; modifiers `Shift`, `Alt`, `Ctrl` as bits. |
 | `Grid`, `Cell` | Cells of one cluster of text and a `Style` each. A two-column character is held by its left cell; writing over either half blanks the other. |
 | `Style`, `Color` | Foreground, background, and `Bold`, `Dim`, `Italic`, `Underline`, `Reverse`. Colours are `Default`, `Basic(0..15)`, `Indexed(0..255)` or `Rgb(r, g, b)`, sent as the nearest the terminal shows (`TrueColor`, `Palette256`, `Basic16`). |
 | Drawing | `g.text`, `g.textIn` (padded, aligned, cut with `…`), `g.box` (four borders, a title), `g.meter` (a bar in eighths of a cell), `g.fill`, each clipped to a `Rect`. |
-| `Table` | Headings, rows given at each `draw`, a selected row kept in view by scrolling. |
+| Layout | `Rect.rows`, `Rect.columns` by `Fixed`, `Fraction` and `Fill`; `shrink`, `pad`, `centered`. |
+| `Table` | Headings, rows given at each `draw`, a selected row kept in view by scrolling; fixed and flexible columns with minimums and weights, cells in their own styles. |
+| `ScrollView`, `LogView` | A window over lines that follows the end, with the pager's keys. |
+| Text | `wrap`, `g.textBlock` (wrapped or cut with `…`), `g.spans`, `g.hline`, `g.vline`, `g.keyHints`, `g.labelValues`. |
+| `ModalStack` | Boxes over the screen that take the input: `MessageBox`, `Confirm`, or a `Modal` of your own. |
+| `g.gauge` | A bar of coloured segments against a budget, between brackets. |
 | `Decoder` | Bytes to events, in pieces of any size; `Renderer`, grids to bytes. Both work with no terminal, which is how they are tested. |
 | Width | `charWidth`, `textWidth`, `clusters`: two columns for East Asian wide characters and emoji, none for combining marks and joiners, from the Unicode 16.0.0 tables in `width_table.avin`. |
+
+## Layout
+
+A rectangle is cut into rows or columns by `Fixed(n)` cells, a `Fraction(num, den)` of the whole,
+or a `Fill(weight)` of what is left; the parts always add up to the whole when one of them fills.
+`shrink(top, right, bottom, left)` and `pad(dx, dy)` take margins or padding off it, and
+`centered(w, h)` places a box in its middle.
+
+```text
+val parts = g.area().rows([Fixed(4), Fill(), Fixed(1)])
+val (header, body, footer) = (parts(0), parts(1), parts(2))
+val sides = body.columns([Fraction(1, 3), Fill()], gap = 1)
+```
+
+## Table
+
+A column of width 0 is flexible: it gets its `min` first, then a share of what is left by its
+`flex` weight. A flexible column there is no room for the minimum of is left out, the last first.
+`drawSpans` draws cells that carry their own style; on the selected row they keep it, reversed.
+
+```text
+val t = Table([Column("ID", 4, 1), Column("STATE", 0, min = 8), Column("COMMAND", 0, flex = 3)])
+t.drawSpans(g, body, jobs.map(j -> [Span(j.id.toString()), Span(j.state, Some(Style.fg(Green))), Span(j.cmd)]))
+```
+
+`header = false` leaves the headings out; `draw` with rows of strings works as before.
+
+## ScrollView and LogView
+
+A `ScrollView` keeps which line is at the top and whether it follows the end; the lines are given to
+each `draw`. Moving up stops following, reaching the end starts it again. `handle(key)` takes the
+arrows, Page Up and Down, Home and End. A `LogView` holds the lines too, the last `limit` of them.
+
+```text
+val log = LogView(limit = 5000)
+log.append(chunk)
+log.draw(g, body)
+if e is KeyPress(k, _) then log.handle(k)
+```
+
+## Text
+
+`wrap(text, width)` breaks at spaces and breaks a word wider than the line between characters, all
+measured in columns, so CJK and emoji take two. `g.textBlock(r, text)` draws it, the last row ending
+with `…` when there is more; `overflow = Ellipsis` cuts each line instead of wrapping.
+
+```text
+val rows = g.textBlock(r, description, Style.fg(BrightBlack))
+```
+
+## Modals
+
+A `ModalStack` draws each modal centred over the screen in a bordered box, and its `handle` gives
+keys, mouse and paste to the top one alone (a `Resize` or `Stop` is never taken). `MessageBox` closes
+on any key; `Confirm` calls back with the answer to `y` or `n`. A `Modal` of your own has a `title`,
+a `measure`, a `draw` and a `handle` that answers whether it stays open.
+
+```text
+modals.push(Confirm("kill", s"Kill job $id?", yes -> if yes then kill(id)))
+if !modals.handle(e) then handleBase(e)
+modals.draw(g, g.area())
+```
+
+## Gauge
+
+```text
+g.gauge(6, 1, 20, [Segment(real(ours), Style.fg(Green)), Segment(real(theirs), Style.fg(Magenta), '▒')], real(budget))
+```
+
+draws `[█████▒▒▒··········]`: each boundary at the nearest cell to where the segments up to it end,
+anything past the budget cut off.
+
+## Small helpers
+
+```text
+g.hline(0, 3, g.width, Style.fg(Cyan))
+g.keyHints(0, g.height - 1, [("q", "quit"), ("↑↓", "move"), ("h", "help")])
+g.labelValues(r, [("kind", job.kind), ("command", job.cmd)])
+```
+
+`keyHints` leaves out a hint that does not fit whole; `labelValues` lines the values up after the
+widest label and cuts them with `…`.
+
+## Mouse reporting is opt-in (changed in 0.2.0)
+
+`Options.mouse` is `false` by default: while a terminal reports the mouse, its own selection and copy
+need a modifier held. Ask for it with `Terminal.use(Options(mouse = true), run)`. Bracketed paste is
+still on by default.
 
 ## On the way out
 

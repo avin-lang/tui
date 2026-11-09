@@ -1,0 +1,113 @@
+module dev.avinlang.tui
+
+// A scrollable window over lines of text: which line is at the top, and whether it follows the end.
+//
+// It keeps only its position, as `Table` does; the lines are given to `draw` each frame. `draw`
+// remembers how many lines there were and how many rows showed them, and the moves between two draws
+// are held to those. While it follows the end (`follow`, true to begin with), every draw shows the
+// last lines, however many have been added since; a move up stops following, and a move that reaches
+// the end starts again. While it does not follow, the line at the top stays where it is as lines are
+// added below.
+class ScrollView()
+    // The first line shown, counted from 0.
+    var offset = 0
+    // Whether each draw scrolls to show the last line.
+    var follow = true
+    // The lines and the rows at the last draw.
+    var count = 0
+    var rows = 1
+
+    // The largest offset, for `count` lines in `rows` rows.
+    maxOffset() -> int = maxOf(count - rows, 0)
+
+    // Whether the last line is shown.
+    atEnd() -> bool = offset >= maxOffset()
+
+    // Scrolls `n` lines down, or up for a negative `n`, held to the lines there are.
+    scrollBy(n: int)
+        scrollTo(offset + n)
+
+    // Puts line `i` at the top, held to the lines there are; following stops unless that shows the end.
+    scrollTo(i: int)
+        offset = if i < 0 then 0 else if i > maxOffset() then maxOffset() else i
+        follow = atEnd()
+
+    lineUp() = scrollBy(-1)
+    lineDown() = scrollBy(1)
+    pageUp() = scrollBy(-maxOf(rows - 1, 1))
+    pageDown() = scrollBy(maxOf(rows - 1, 1))
+    home() = scrollTo(0)
+
+    // Shows the last line and follows the end from now on.
+    toEnd()
+        offset = maxOffset()
+        follow = true
+
+    // Moves for the keys a pager has: the arrows up and down by a line, Page Up and Page Down by a
+    // page less one line, Home and End to the ends. Answers whether `k` was one of them.
+    handle(k: Key) -> bool
+        k match
+            Up -> lineUp()
+            Down -> lineDown()
+            PageUp -> pageUp()
+            PageDown -> pageDown()
+            Home -> home()
+            End -> toEnd()
+            _ -> return false
+        true
+
+    // Takes the size of what is drawn, `count` lines in `rows` rows, and holds the position to it.
+    fit(lineCount: int, rowCount: int)
+        count = maxOf(lineCount, 0)
+        rows = maxOf(rowCount, 1)
+        if follow || offset > maxOffset() then offset = maxOffset()
+        if offset < 0 then offset = 0
+
+    // Draws the lines it shows of `lines` into `r` in `style`, one to a row, each cut at the right edge
+    // and the rows under the last line left blank.
+    draw(g: Grid, r: Rect, lines: Vector[string], style: Style = Style.plain())
+        if r.isEmpty() then return
+        fit(lines.length(), r.h)
+        g.fill(r.x, r.y, r.w, r.h, style)
+        for k in 0 ..< minOf(r.h, count - offset)
+            g.text(r.x, r.y + k, lines(offset + k), style, r)
+
+// A log: lines added at the end, at most `limit` of them kept, the oldest dropped first, shown in a
+// `ScrollView`. Text added is cut into lines at `\n`. While the view does not follow the end, lines
+// dropped from the start move it up with them, so the lines it shows stay in place.
+class LogView(val limit: int = 10000)
+    val view: ScrollView = ScrollView()
+    private val held: Deque[string] = Deque[string]()
+
+    // The lines kept, oldest first.
+    lines() -> Vector[string] = held.toVector()
+
+    // How many lines are kept.
+    length() -> int = held.length()
+
+    // Adds `text` as one line, or several where it holds `\n`.
+    append(text: string)
+        for line in text.split("\n")
+            held.append(line)
+        var dropped = 0
+        while held.length() > maxOf(limit, 1)
+            held.removeHead()
+            dropped += 1
+        if dropped > 0 && !view.follow then view.offset = maxOf(view.offset - dropped, 0)
+
+    // Forgets every line and follows the end again.
+    clear()
+        held.clear()
+        view.offset = 0
+        view.follow = true
+
+    // Moves the view for a pager's keys, as `ScrollView.handle`.
+    handle(k: Key) -> bool = view.handle(k)
+
+    // Draws the view of the lines into `r`, as `ScrollView.draw` does, reading only the lines shown.
+    draw(g: Grid, r: Rect, style: Style = Style.plain())
+        if r.isEmpty() then return
+        view.fit(held.length(), r.h)
+        g.fill(r.x, r.y, r.w, r.h, style)
+        for k in 0 ..< minOf(r.h, held.length() - view.offset)
+            g.text(r.x, r.y + k, held(view.offset + k), style, r)

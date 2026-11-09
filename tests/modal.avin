@@ -1,0 +1,109 @@
+module tests
+
+// The modal stack: where a modal is drawn and how, which events it takes, and the two modals tui has.
+import dev.avinlang.tui.{Char, Confirm, Drag, Escape, Grid, KeyPress, MessageBox, ModalStack, Mouse,
+                         MouseEvent, Press, Rect, Resize, Stop}
+
+@test("an empty stack takes no event and draws nothing")
+modalEmpty()
+    val m = ModalStack()
+    assertEq(m.isEmpty(), true)
+    assertEq(m.handle(KeyPress(Char('q'), 0)), false)
+    assertEq(m.pop().isEmpty(), true)
+    assertEq(m.top().isEmpty(), true)
+    val g = Grid(4, 2)
+    m.draw(g, g.area())
+    assertEq(rows(g), ["    ", "    "])
+
+@test("a message box is centred, bordered, titled, and drawn over what was there")
+modalMessageDraws()
+    val g = Grid(20, 5)
+    g.text(0, 0, "base")
+    val m = ModalStack()
+    m.push(MessageBox("help", "q quit"))
+    m.draw(g, Rect(0, 0, 20, 5))
+    assertEq(rows(g), [
+        "base                ",
+        "     ╭─help───╮     ",
+        "     │ q quit │     ",
+        "     ╰────────╯     ",
+        "                    "
+    ])
+
+@test("any key closes a message box, and so does a click but not a drag")
+modalMessageCloses()
+    val m = ModalStack()
+    m.push(MessageBox("help", "text"))
+    assertEq(m.handle(Mouse(MouseEvent(Drag, 0, 1, 1, 0))), true)
+    assertEq(m.length(), 1)
+    assertEq(m.handle(Mouse(MouseEvent(Press, 0, 1, 1, 0))), true)
+    assertEq(m.isEmpty(), true)
+    m.push(MessageBox("help", "text"))
+    assertEq(m.handle(KeyPress(Char('x'), 0)), true)
+    assertEq(m.isEmpty(), true)
+
+@test("a resize or a stop is never taken, and leaves the modal open")
+modalPassesResizeAndStop()
+    val m = ModalStack()
+    m.push(MessageBox("help", "text"))
+    assertEq(m.handle(Resize(80, 24)), false)
+    assertEq(m.handle(Stop(15)), false)
+    assertEq(m.length(), 1)
+
+@test("input goes to the top modal alone, and closing it uncovers the one under it")
+modalStackOrder()
+    val answers = Buffer[bool]()
+    val m = ModalStack()
+    m.push(MessageBox("help", "text"))
+    m.push(Confirm("kill", "Kill job 7?", a -> answers.addOne(a)))
+    assertEq(m.handle(KeyPress(Char('x'), 0)), true)
+    assertEq(m.length(), 2)
+    assertEq(answers.length(), 0)
+    assertEq(m.handle(KeyPress(Char('y'), 0)), true)
+    assertEq(m.length(), 1)
+    assertEq(answers.toVector(), [true])
+    assertEq(m.top().map(t -> t.title()), Some("help"))
+
+@test("a question is answered no by n, N or Escape")
+modalConfirmNo()
+    val answers = Buffer[bool]()
+    for e in [KeyPress(Char('n'), 0), KeyPress(Char('N'), 0), KeyPress(Escape, 0), KeyPress(Char('Y'), 0)]
+        val m = ModalStack()
+        m.push(Confirm("kill", "Kill?", a -> answers.addOne(a)))
+        m.handle(e)
+        assertEq(m.isEmpty(), true)
+    assertEq(answers.toVector(), [false, false, false, true])
+
+@test("a question shows its text and the keys that answer it")
+modalConfirmDraws()
+    val g = Grid(20, 6)
+    val m = ModalStack()
+    m.push(Confirm("kill", "Kill job 7?", a -> ()))
+    m.draw(g, g.area())
+    assertEq(rows(g), [
+        "  ╭─kill────────╮   ",
+        "  │ Kill job 7? │   ",
+        "  │             │   ",
+        "  │ y yes  n no │   ",
+        "  ╰─────────────╯   ",
+        "                    "
+    ])
+
+@test("a modal bigger than the screen is cut to it, its text ending with an ellipsis")
+modalTooBig()
+    val g = Grid(10, 4)
+    val m = ModalStack()
+    m.push(MessageBox("t", "aaa bbb ccc ddd"))
+    m.draw(g, g.area())
+    assertEq(rows(g), ["╭─t──────╮", "│ aaa    │", "│ bbb…   │", "╰────────╯"])
+
+@test("a screen too small for a border draws no modal and does not trap")
+modalTiny()
+    val g = Grid(1, 1)
+    val m = ModalStack()
+    m.push(MessageBox("help", "text"))
+    m.draw(g, g.area())
+    assertEq(g.rowText(0), " ")
+    m.draw(g, Rect(0, 0, 0, 0))
+    m.clear()
+    assertEq(m.isEmpty(), true)
