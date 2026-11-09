@@ -244,11 +244,11 @@ Brackets take two of the given width and are left off under three columns.
 
 ## 0.2.1: closing the gaps marshal's `top` drew by hand
 
-Each of these is **Proposed** (branch `tui-021`): built so that a port of marshal's `top` can draw
+Each of these was **settled on the user's delegation 2026-11-09** (branch `tui-021`): built so that a port of marshal's `top` can draw
 its memory bar, footer, log header, LABEL column and log pane with tui and look byte for byte as it
 does now. Every new parameter defaults to the 0.2.0 behaviour.
 
-### Gauge boundaries: the product before the quotient (bug fix) — **Proposed**
+### Gauge boundaries: the product before the quotient (bug fix)
 
 `gaugeCells` rounded `sum / budget * width + 0.5`, so 15 of 22 in 11 cells (exactly 7.5) came out
 7.4999… and rounded down. It now rounds `sum * width / budget + 0.5`: with whole amounts the product
@@ -259,7 +259,7 @@ is exact, and a quotient that is exactly a half is representable, so it rounds u
 - **Alternatives:** integer amounts (`Segment.amount` is a `real`, and memory is not whole cells);
   rounding with an epsilon (moves the error rather than removing it).
 
-### Gauge eighths: `eighths = true`; an overlay is two segments end to end — **Proposed**
+### Gauge eighths: `eighths = true`; an overlay is two segments end to end
 
 `gauge(..., eighths = true)` and `gaugeEighths` place each boundary at the nearest eighth of a
 cell. A cell is drawn by the segment its left edge falls in: whole in the segment's character, or a
@@ -278,7 +278,7 @@ budgets, twelve widths and every reserved/held pair, and compares every cell.
   segments. Exact halves of an eighth now round up where top's quotient-first rounding could round
   down, so the port differs from today's top only there, in the fix's favour.
 
-### Key hints: `sep`, `gap` and `cut` — **Proposed**
+### Key hints: `sep`, `gap` and `cut`
 
 `keyHints(..., sep = 1, gap = 2, cut = false)`: the blanks after a key and between hints, and
 whether the last hint that does not fit is cut at the edge (every hint drawn, clipped, the answer
@@ -290,7 +290,7 @@ true`, the key bold and the word with its trailing space black on cyan.
 - **Alternatives:** a style for the gaps (top needs none); a `Span` list per hint (more general,
   but `spans` already is that).
 
-### `wrapChars` and `Overflow.WrapChars` — **Proposed**
+### `wrapChars` and `Overflow.WrapChars`
 
 Breaks each `\n`-separated line between any two clusters, filling each row, dropping and adding
 nothing, so the rows of a line joined are that line: top's command and label in the log header.
@@ -303,7 +303,7 @@ Measured in columns by cluster, so a wide character is never split; for ASCII it
   top does; wrong for CJK). Adding a variant to `Overflow` breaks an exhaustive `match` on it in a
   program; none is known, and the brief named this shape.
 
-### Column `max`, `fit` and `keep` — **Proposed**
+### Column `max`, `fit` and `keep`
 
 `max` caps a flexible column (what it gives up is shared again among the others, or left blank when
 all are capped) and a fit column. `fit = true` sizes a column to its widest cell in the rows drawn,
@@ -322,7 +322,7 @@ length up to 31. `widths(width, rows)` is new, beside `widths(width)`.
   to the heading's width instead); `keep` on the fit column as "leave this much" (it is the flexible
   column's need, so it sits there).
 
-### ScrollView: `fromEnd`, `back`, `backLimit`, `overlap` — **Proposed**
+### ScrollView: `fromEnd`, `back`, `backLimit`, `overlap`
 
 With `fromEnd = true` the position is `back`, lines back from the end, kept as lines are added;
 `follow` is `back == 0`; Home goes as far back as allowed. `back` is held to the lines at the last
