@@ -159,9 +159,10 @@ sees only `Sample`s from a `Source`.
 
 ## 0.2.0 widgets
 
-The decisions below are **Proposed** (branch `tui-020`), awaiting the user's review.
+The decisions below were **settled on the user's delegation 2026-11-09** (built on branch `tui-020`). Review with the user: the
+widget API as a whole, once marshal's `top` has been ported onto it.
 
-### Mouse reporting is off unless asked for — Proposed
+### Mouse reporting is off unless asked for
 
 `Options.mouse` defaults to `false`; bracketed paste stays on. `examples/hello` and `examples/top`
 ask for the mouse, since they show it.
@@ -171,7 +172,7 @@ ask for the mouse, since they show it.
   does not take anything from the terminal, so it stays on.
 - **Alternatives:** keep it on (the program that does not use the mouse pays for the one that does).
 
-### Splits are `Fixed`, `Fraction` and `Fill`, served in order — Proposed
+### Splits are `Fixed`, `Fraction` and `Fill`, served in order
 
 `splitSizes` gives fixed parts and fractions what they ask, first come first served, and shares what
 is left among the fills by weight, cut at the running total so the last fill takes the remainder.
@@ -182,7 +183,7 @@ Margins and padding are both `Rect.shrink`/`pad`: there is no box model, only re
 - **Alternatives:** a constraint solver with `Min`/`Max` (ratatui's Cassowary; much more code for
   layouts this size); a fraction as a `real`; percentages.
 
-### Table columns: `min` and `flex` on `Column`; dropped columns take their gap — Proposed
+### Table columns: `min` and `flex` on `Column`; dropped columns take their gap
 
 `Column` gained `min = 0` and `flex = 1`, so every 0.1.0 table keeps its widths. When the flexible
 columns' minimums do not fit, the last flexible column with a minimum is left out (with the blank
@@ -196,7 +197,7 @@ with `selectedStyle`'s attributes added.
 - **Alternatives:** a `max` per column (not needed yet); a priority per column for dropping;
   replacing a selected cell's style with `selectedStyle` (loses the colour).
 
-### `ScrollView` is top-anchored with a follow flag — Proposed
+### `ScrollView` is top-anchored with a follow flag
 
 The view keeps the top line and `follow`; a draw while following shows the end; moving up stops
 following, reaching the end starts it again. Like `Table`, it holds no lines; `LogView` is the one that
@@ -206,7 +207,7 @@ does, the last `limit` in a `Deque`, moving a non-following view up as old lines
   that, where counting back from the end (what marshal's `top` does) shifts on every line added.
 - **Alternatives:** an offset from the end; following only by an explicit key.
 
-### Wrapping breaks at spaces, a long word between clusters — Proposed
+### Wrapping breaks at spaces, a long word between clusters
 
 `wrap` breaks each `\n`-separated line at spaces, keeps spaces between two words of a row and an
 indent at the start of the first row, drops them at a break, and breaks a word wider than the row
@@ -218,7 +219,7 @@ not fit ends its last row with `…`.
 - **Alternatives:** Unicode line breaking (UAX #14; breaks between CJK characters too, much more
   table); hyphenation; character wrap only (what marshal's `top` does).
 
-### Modals are a trait over a stack; Resize and Stop pass through — Proposed
+### Modals are a trait over a stack; Resize and Stop pass through
 
 `Modal` has `title`, `measure`, `draw` and `handle(e) -> bool` (stays open). `ModalStack` draws each
 centred and bordered, bottom first, and gives keys, mouse and paste to the top alone; `Resize` and
@@ -230,7 +231,7 @@ two built in.
 - **Alternatives:** one modal slot (no confirm over a help); modals returning an enum of outcomes
   (the callback in `Confirm` keeps the trait to one bool).
 
-### Gauge segments round at cumulative boundaries, in whole cells — Proposed
+### Gauge segments round at cumulative boundaries, in whole cells
 
 Each boundary is placed at the nearest cell to where the segments up to it end; what passes the
 budget is cut off. Every cell is one column: a wide character for a segment is drawn as `█`.
