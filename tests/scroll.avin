@@ -2,7 +2,7 @@ module tests
 
 // The scroll view's position across draws, following the end, the pager's keys, and the log view's
 // limit on the lines it keeps.
-import dev.avinlang.tui.{Char, Down, End, Grid, Home, LogView, PageDown, PageUp, Rect, ScrollView, Up}
+import dev.avinlang.tui.{Char, Down, End, Grid, Home, Key, LogView, PageDown, PageUp, Rect, ScrollView, Up}
 
 numberedLines(n: int) -> Vector[string] = Vector.tabulate(n, i -> s"l$i")
 
@@ -151,3 +151,186 @@ logDropsUnderView()
     assertEq(log.view.follow, true)
     log.draw(g, g.area())
     assertEq(rows(g), ["   ", "   "])
+
+@test("with overlap 0 a page is the whole view, and a larger overlap still moves a line")
+scrollOverlap()
+    val g = Grid(4, 3)
+    val v = ScrollView()
+    v.overlap = 0
+    v.draw(g, g.area(), numberedLines(12))
+    v.home()
+    v.pageDown()
+    assertEq(v.offset, 3)
+    assertEq(v.pageSize(), 3)
+    v.overlap = 5
+    assertEq(v.pageSize(), 1)
+    v.pageDown()
+    assertEq(v.offset, 4)
+    v.overlap = -2
+    assertEq(v.pageSize(), 3)
+    v.overlap = 1
+    assertEq(v.pageSize(), 2)
+    val one = ScrollView()
+    one.overlap = 0
+    one.draw(Grid(2, 1), Rect(0, 0, 2, 1), numberedLines(5))
+    one.pageUp()
+    assertEq(one.offset, 3)
+
+@test("anchored at the end, the view keeps its lines back as lines come, so what it shows moves up")
+scrollFromEnd()
+    val g = Grid(4, 3)
+    val v = ScrollView()
+    v.fromEnd = true
+    v.draw(g, g.area(), numberedLines(10))
+    assertEq(v.offset, 7)
+    assertEq(v.back, 0)
+    v.lineUp()
+    assertEq(v.back, 1)
+    assertEq(v.offset, 6)
+    assertEq(v.follow, false)
+    v.draw(g, g.area(), numberedLines(12))
+    assertEq(v.back, 1)
+    assertEq(v.offset, 8)
+    assertEq(rows(g), ["l8  ", "l9  ", "l10 "])
+    v.lineDown()
+    assertEq(v.back, 0)
+    assertEq(v.follow, true)
+    v.pageUp()
+    assertEq(v.back, 2)
+    v.home()
+    assertEq(v.back, 9)
+    assertEq(v.offset, 0)
+    v.pageUp()
+    assertEq(v.back, 9)
+    v.scrollTo(4)
+    assertEq(v.back, 5)
+    assertEq(v.offset, 4)
+    v.scrollTo(-3)
+    assertEq(v.back, 9)
+    v.scrollTo(50)
+    assertEq(v.back, 0)
+    v.pageUp()
+    v.toEnd()
+    assertEq(v.back, 0)
+    assertEq(v.offset, 9)
+    assertEq(v.follow, true)
+
+@test("anchored at the end: fewer lines than rows, lines that shrink, and a view of one row")
+scrollFromEndEdges()
+    val g = Grid(4, 3)
+    val v = ScrollView()
+    v.fromEnd = true
+    v.draw(g, g.area(), numberedLines(2))
+    v.pageUp()
+    assertEq(v.back, 0)
+    assertEq(rows(g), ["l0  ", "l1  ", "    "])
+    v.draw(g, g.area(), numberedLines(10))
+    v.home()
+    assertEq(v.back, 7)
+    v.draw(g, g.area(), numberedLines(5))
+    assertEq(v.back, 2)
+    assertEq(v.offset, 0)
+    v.draw(g, g.area(), [])
+    assertEq(v.back, 0)
+    assertEq(v.follow, true)
+    assertEq(rows(g), ["    ", "    ", "    "])
+    val one = ScrollView()
+    one.fromEnd = true
+    one.draw(Grid(2, 1), Rect(0, 0, 2, 1), numberedLines(5))
+    one.handle(PageUp)
+    assertEq(one.back, 1)
+    one.draw(Grid(2, 0), Rect(0, 0, 2, 0), numberedLines(5))
+    assertEq(one.back, 1)
+
+@test("anchored at the end with a limit, the view goes back past the lines it was given, up to the limit")
+scrollFromEndLimit()
+    val g = Grid(4, 2)
+    val v = ScrollView()
+    v.fromEnd = true
+    v.backLimit = 5
+    v.overlap = 0
+    v.draw(g, g.area(), numberedLines(3))
+    v.handle(PageUp)
+    assertEq(v.back, 2)
+    v.handle(PageUp)
+    assertEq(v.back, 4)
+    v.handle(Home)
+    assertEq(v.back, 5)
+    v.draw(g, g.area(), numberedLines(3))
+    assertEq(v.back, 5)
+    assertEq(v.offset, 0)
+    assertEq(rows(g), ["l0  ", "l1  "])
+    v.backLimit = 3
+    v.draw(g, g.area(), numberedLines(3))
+    assertEq(v.back, 3)
+    v.handle(End)
+    assertEq(v.back, 0)
+    v.backLimit = 0
+    v.handle(Home)
+    assertEq(v.back, 0)
+
+@test("a log anchored at the end keeps its lines back as old lines are dropped")
+logFromEnd()
+    val g = Grid(3, 2)
+    val log = LogView(4)
+    log.view.fromEnd = true
+    for i in 0 ..< 4
+        log.append(s"l$i")
+    log.draw(g, g.area())
+    log.handle(Up)
+    log.append("l4")
+    log.draw(g, g.area())
+    assertEq(log.view.back, 1)
+    assertEq(rows(g), ["l2 ", "l3 "])
+    log.clear()
+    assertEq(log.view.back, 0)
+
+// marshal top's log pane as it scrolls by hand: `back` lines back from the end, held to `limit`, the
+// pane reading the last `rows + back` lines of the log and showing those that end `back` lines before
+// the last, or the first of them where there are not that many.
+topLogDraw(g: Grid, r: Rect, view: ScrollView, log: Vector[string], back: int)
+    val n = log.length()
+    val read = log.slice(largerOf(n - (r.h + back), 0), n)
+    val m = read.length()
+    view.draw(g, r, read.slice(0, m - smallerOf(back, largerOf(m - r.h, 0))))
+
+// The last lines of `log` a pane anchored at the end reads: as many as it shows and as many back.
+tail(log: Vector[string], view: ScrollView, height: int) -> Vector[string] =
+    log.slice(largerOf(log.length() - (height + view.back), 0), log.length())
+
+topScroll(back: int, n: int, limit: int) -> int = if back + n < 0 then 0 else if back + n > limit then limit else back + n
+
+largerOf(a: int, b: int) -> int = if a > b then a else b
+smallerOf(a: int, b: int) -> int = if a < b then a else b
+
+@test("anchored at the end, paging by the whole view, with a limit: marshal top's log pane, line for line")
+scrollMatchesTopLog()
+    val limit = 40
+    val keys = [PageUp, PageUp, PageDown, Home, PageDown, PageDown, End, PageUp, Home, End, PageUp, PageUp, PageUp]
+    for height in 1 ..< 6
+        for start in [0, 2, 7, 30]
+            val want = Grid(5, height)
+            val got = Grid(5, height)
+            val follow = ScrollView()
+            var back = 0
+            val port = ScrollView()
+            port.fromEnd = true
+            port.overlap = 0
+            port.backLimit = limit
+            var log = numberedLines(start)
+            topLogDraw(want, want.area(), follow, log, back)
+            port.draw(got, got.area(), tail(log, port, height))
+            for (k, i) in keys.zipWithIndex()
+                k match
+                    PageUp -> back = topScroll(back, height, limit)
+                    PageDown -> back = topScroll(back, -height, limit)
+                    Home -> back = topScroll(back, limit, limit)
+                    _ -> back = 0
+                port.handle(k)
+                assertEq(port.back, back)
+                // lines arrive between keys
+                log = numberedLines(start + i * 3)
+                topLogDraw(want, want.area(), follow, log, back)
+                port.draw(got, got.area(), tail(log, port, height))
+                assertEq(rows(got), rows(want))
+                assertEq(port.back, back)

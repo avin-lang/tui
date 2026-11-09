@@ -9,7 +9,7 @@ The module is `dev.avinlang.tui`.
 
 ```hocon
 dependencies {
-  tui { git = "github.com/avin-lang/tui", version = "0.2.0" }
+  tui { git = "github.com/avin-lang/tui", version = "0.2.1" }
 }
 ```
 
@@ -101,6 +101,16 @@ t.drawSpans(g, body, jobs.map(j -> [Span(j.id.toString()), Span(j.state, Some(St
 
 `header = false` leaves the headings out; `draw` with rows of strings works as before.
 
+`max` holds a flexible column to at most that many columns, what it gives up going to the others.
+`fit = true` sizes a column to its widest cell in the rows drawn, between `min` and `max`; it gives
+way to the flexible columns, narrowed down to its `min` so each keeps its `keep` (or its `min`), then
+left out, as is a fit column with nothing in it. `widths(width, rows)` answers the widths a draw of
+those rows would use.
+
+```text
+val t = Table([Column("ID", 5, 1), Column("LABEL", 0, min = 5, max = 24, fit = true), Column("COMMAND", 0, keep = 20)])
+```
+
 ## ScrollView and LogView
 
 A `ScrollView` keeps which line is at the top and whether it follows the end; the lines are given to
@@ -114,11 +124,27 @@ log.draw(g, body)
 if e is KeyPress(k, _) then log.handle(k)
 ```
 
+A page is the rows less `overlap` (1 by default; 0 pages by the whole view). With `fromEnd = true`
+the view is anchored at the bottom: its position is `back`, the lines from the last shown to the
+last, kept as lines are added, so what it shows moves up with them. `back` is held to the lines
+there are, or with `backLimit` set to that alone, for a pane that reads only the last `rows + back`
+lines of a longer log.
+
+```text
+val view = ScrollView()
+view.fromEnd = true
+view.overlap = 0
+view.backLimit = 10000
+view.draw(g, pane, readLastLines(log, pane.h + view.back))
+```
+
 ## Text
 
 `wrap(text, width)` breaks at spaces and breaks a word wider than the line between characters, all
 measured in columns, so CJK and emoji take two. `g.textBlock(r, text)` draws it, the last row ending
 with `…` when there is more; `overflow = Ellipsis` cuts each line instead of wrapping.
+`wrapChars(text, width)`, and `overflow = WrapChars`, break between any two characters instead,
+filling every line, so the lines joined are the text: for command lines and paths.
 
 ```text
 val rows = g.textBlock(r, description, Style.fg(BrightBlack))
@@ -143,8 +169,16 @@ modals.draw(g, g.area())
 g.gauge(6, 1, 20, [Segment(real(ours), Style.fg(Green)), Segment(real(theirs), Style.fg(Magenta), '▒')], real(budget))
 ```
 
-draws `[█████▒▒▒··········]`: each boundary at the nearest cell to where the segments up to it end,
-anything past the budget cut off.
+draws `[█████▒▒▒··········]`: each boundary at the nearest cell to where the segments up to it end
+(an exact half rounding up), anything past the budget cut off.
+
+`eighths = true` places the boundaries in eighths of a cell: a cell a segment only partly covers is
+a left block (`▏` to `▉`) in its colour over `empty`'s background. One part drawn over the start of
+another is two segments end to end, the inner one and then the rest of the outer:
+
+```text
+g.gauge(6, 2, 22, [Segment(real(reserved), Style.fg(Cyan)), Segment(real(held - reserved), Style.fg(Blue))], real(budget), rest = ' ', eighths = true)
+```
 
 ## Small helpers
 
@@ -155,7 +189,12 @@ g.labelValues(r, [("kind", job.kind), ("command", job.cmd)])
 ```
 
 `keyHints` leaves out a hint that does not fit whole; `labelValues` lines the values up after the
-widest label and cuts them with `…`.
+widest label and cuts them with `…`. `keyHints` takes `sep` (blanks after a key, 1) and `gap`
+(blanks between hints, 2), and `cut = true` cuts the last hint at the edge instead of leaving it out:
+
+```text
+g.keyHints(0, y, [("h", "Help "), ("Enter", "Log ")], Style.plain().with(Bold), Style(Black, Cyan, 0), sep = 0, gap = 0, cut = true)
+```
 
 ## Mouse reporting is opt-in (changed in 0.2.0)
 

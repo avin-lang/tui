@@ -1,7 +1,7 @@
 module tests
 
 // Segmented gauges: how the cells are shared out against a budget, and how the gauge is drawn.
-import dev.avinlang.tui.{BrightBlack, Green, Grid, Magenta, Rect, Segment, Style, gaugeCells}
+import dev.avinlang.tui.{Blue, BrightBlack, Cyan, Green, Grid, Magenta, Rect, Red, Segment, Style, gaugeCells, gaugeEighths}
 
 @test("segments take their share of the budget, laid end to end")
 gaugeShares()
@@ -77,3 +77,143 @@ gaugeWideChars()
     val g = Grid(6, 1)
     g.gauge(0, 0, 6, [Segment(1.0, Style.fg(Green), '日')], 2.0, rest = '本')
     assertEq(g.rowText(0), "[██··]")
+
+@test("a boundary on an exact half of a cell rounds up, however the budget divides")
+gaugeExactHalves()
+    val s = Style.fg(Green)
+    // 15 of 22 in 11 cells is 7.5 cells; 15 / 22 * 11 falls just under it
+    assertEq(gaugeCells(11, [Segment(0.0, s), Segment(15.0, s)], 22.0), [0, 8])
+    assertEq(gaugeCells(11, [Segment(15.0, s)], 22.0), [8])
+    for k in 0 ..< 23
+        assertEq(gaugeCells(11, [Segment(real(k), s)], 22.0), [(k + 1) / 2])
+    for k in 0 ..< 101
+        assertEq(gaugeCells(10, [Segment(real(k), s)], 100.0), [(k + 5) / 10])
+    for k in 0 ..< 57
+        assertEq(gaugeCells(7, [Segment(real(k), s)], 56.0), [(k + 4) / 8])
+    assertEq(gaugeCells(3, [Segment(1.0, s)], 2.0), [2])
+    assertEq(gaugeCells(7, [Segment(1.0, s), Segment(1.0, s)], 2.0), [4, 3])
+
+@test("just under and just over a half, and the ends of the budget")
+gaugeHalfNeighbours()
+    val s = Style.fg(Green)
+    assertEq(gaugeCells(10, [Segment(0.0499, s)], 1.0), [0])
+    assertEq(gaugeCells(10, [Segment(0.05, s)], 1.0), [1])
+    assertEq(gaugeCells(10, [Segment(0.9499, s)], 1.0), [9])
+    assertEq(gaugeCells(10, [Segment(0.95, s)], 1.0), [10])
+    assertEq(gaugeCells(10, [Segment(0.9999, s)], 1.0), [10])
+    assertEq(gaugeCells(10, [Segment(1.0, s), Segment(0.5, s)], 1.0), [10, 0])
+    assertEq(gaugeCells(1, [Segment(1.0, s)], 2.0), [1])
+    assertEq(gaugeCells(1, [Segment(0.99, s)], 2.0), [0])
+
+@test("eighths: each boundary at the nearest eighth of a cell, halves rounding up")
+gaugeEighthCounts()
+    val s = Style.fg(Green)
+    for k in 0 ..< 17
+        assertEq(gaugeEighths(1, [Segment(real(k), s)], 16.0), [(k + 1) / 2])
+    assertEq(gaugeEighths(2, [Segment(3.0, s), Segment(2.0, s)], 8.0), [6, 4])
+    assertEq(gaugeEighths(11, [Segment(0.0, s), Segment(15.0, s)], 22.0), [0, 60])
+    assertEq(gaugeEighths(2, [Segment(9.0, s), Segment(9.0, s)], 10.0), [14, 2])
+    assertEq(gaugeEighths(0, [Segment(1.0, s)], 1.0), [0])
+    assertEq(gaugeEighths(-2, [Segment(1.0, s)], 1.0), [0])
+    assertEq(gaugeEighths(3, [], 1.0), [])
+    assertEq(gaugeEighths(3, [Segment(1.0, s)], 0.0), [0])
+    assertEq(gaugeEighths(3, [Segment(0.0 / 0.0, s), Segment(-1.0, s), Segment(1.0, s)], 3.0), [0, 0, 8])
+
+@test("an eighths gauge draws a part cell as a left block in the segment's colour on the empty background")
+gaugeEighthsDraw()
+    val cyan = Style.fg(Cyan)
+    val blue = Style.fg(Blue)
+    val empty = Style(BrightBlack, Red, 0)
+    val g = Grid(4, 1)
+    assertEq(g.gauge(0, 0, 4, [Segment(3.0, cyan), Segment(2.0, blue)], 16.0, empty = empty, brackets = false, eighths = true), 4)
+    // cyan ends at 6 eighths, blue at 10: cell 0 is cyan's, cell 1 blue's, the rest empty
+    assertEq(g.rowText(0), "▊▎··")
+    assertEq(g(0, 0).style, Style(Cyan, Red, 0))
+    assertEq(g(1, 0).style, Style(Blue, Red, 0))
+    assertEq(g(2, 0).style, empty)
+    val h = Grid(6, 1)
+    h.gauge(0, 0, 6, [Segment(1.0, cyan), Segment(1.0, blue, '▒')], 2.0, eighths = true)
+    assertEq(h.rowText(0), "[██▒▒]")
+    assertEq(h(2, 0).style, cyan)
+    assertEq(h(3, 0).style, blue)
+
+@test("an eighths gauge: a segment inside another's part cell is hidden, and each block width shows")
+gaugeEighthsInsideOneCell()
+    val cyan = Style.fg(Cyan)
+    val blue = Style.fg(Blue)
+    val g = Grid(1, 1)
+    // cyan ends at 2 eighths, blue at 5, both inside the one cell: the cell is cyan's
+    g.gauge(0, 0, 1, [Segment(2.0, cyan), Segment(3.0, blue)], 8.0, eighths = true)
+    assertEq(g.rowText(0), "▎")
+    assertEq(g(0, 0).style.fg, Cyan)
+    val blocks = " ▏▎▍▌▋▊▉█"
+    for k in 1 ..< 9
+        val h = Grid(1, 1)
+        h.gauge(0, 0, 1, [Segment(real(k), cyan)], 8.0, rest = '·', eighths = true)
+        assertEq(h.rowText(0), blocks.chars()(k).toString())
+    val e = Grid(1, 1)
+    e.gauge(0, 0, 1, [Segment(0.0, cyan)], 8.0, eighths = true)
+    assertEq(e.rowText(0), "·")
+
+@test("an eighths gauge: overflow cut at the end, no budget, tiny widths, wide characters and the clip")
+gaugeEighthsEdges()
+    val cyan = Style.fg(Cyan)
+    val g = Grid(5, 1)
+    g.gauge(0, 0, 5, [Segment(9.0, cyan), Segment(9.0, Style.fg(Blue))], 4.0, eighths = true)
+    assertEq(g.rowText(0), "[███]")
+    assertEq(g(3, 0).style, cyan)
+    val n = Grid(5, 1)
+    n.gauge(0, 0, 5, [Segment(1.0, cyan)], 0.0, rest = ' ', eighths = true)
+    assertEq(n.rowText(0), "[   ]")
+    val z = Grid(3, 1)
+    assertEq(z.gauge(1, 0, 0, [Segment(1.0, cyan)], 1.0, eighths = true), 1)
+    assertEq(z.rowText(0), "   ")
+    z.gauge(1, 0, 1, [Segment(1.0, cyan)], 2.0, eighths = true)
+    assertEq(z.rowText(0), " ▌ ")
+    val two = Grid(2, 1)
+    two.gauge(0, 0, 2, [Segment(3.0, cyan)], 4.0, eighths = true)
+    assertEq(two.rowText(0), "█▌")
+    val w = Grid(4, 1)
+    w.gauge(0, 0, 4, [Segment(1.0, cyan, '日')], 1.0, rest = '本', eighths = true)
+    assertEq(w.rowText(0), "[██]")
+    val half = Grid(4, 1)
+    half.gauge(0, 0, 4, [Segment(1.0, cyan, '日')], 4.0, rest = '本', eighths = true)
+    assertEq(half.rowText(0), "[▌·]")
+    val c = Grid(6, 1)
+    c.gauge(0, 0, 6, [Segment(1.0, cyan)], 1.0, clip = Rect(0, 0, 3, 1), eighths = true)
+    assertEq(c.rowText(0), "[██   ")
+
+// marshal top's memory bar as it draws it by hand: two meters, the reserved one over the held one.
+topMemBar(g: Grid, x: int, y: int, width: int, reserved: int, held: int, budget: int)
+    g.text(x, y, "[")
+    val share = (part: int) -> if budget > 0 then (if part >= budget then 1.0 else real(part) / real(budget)) else 0.0
+    val mine = share(reserved)
+    if held > reserved && budget > 0
+        g.meter(x + 1, y, width, share(held), Style.fg(Blue), Style.fg(BrightBlack))
+        val eighths = int(mine * real(width * 8) + 0.5)
+        val cells = (eighths + 7) / 8
+        if cells > 0 then g.meter(x + 1, y, width, mine, Style.fg(Cyan), Style.fg(BrightBlack), Rect(x + 1, y, cells, 1))
+    else
+        g.meter(x + 1, y, width, mine, Style.fg(Cyan), Style.fg(BrightBlack))
+    g.text(x + 1 + width, y, "]")
+
+// Whether `part` of `budget` in `width` cells falls on an exact half of an eighth, where top's
+// rounding (of the quotient first) and the gauge's (of the product first) may differ.
+onHalfEighth(part: int, budget: int, width: int) -> bool =
+    0 < part < budget && part * width * 16 % budget == 0 && part * width * 16 / budget % 2 == 1
+
+@test("an eighths gauge of the reserved part then the rest of the held draws top's memory bar cell for cell")
+gaugeMatchesTopMemBar()
+    for budget in [0, 7, 10, 24, 56]
+        for width in 1 ..< 13
+            for reserved in 0 ..< budget + 3
+                for held in reserved - 2 ..< budget + 4
+                    if onHalfEighth(reserved, budget, width) || onHalfEighth(held, budget, width) then continue
+                    val want = Grid(width + 4, 1)
+                    topMemBar(want, 1, 0, width, reserved, held, budget)
+                    val got = Grid(width + 4, 1)
+                    val after = got.gauge(1, 0, width + 2, [Segment(real(reserved), Style.fg(Cyan)), Segment(real(held - reserved), Style.fg(Blue))], real(budget), rest = ' ', eighths = true)
+                    assertEq(after, width + 3)
+                    assertEq(got.rowText(0), want.rowText(0))
+                    for i in 0 ..< width + 4
+                        assertEq(got(i, 0).style, want(i, 0).style)

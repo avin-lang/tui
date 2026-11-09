@@ -241,3 +241,97 @@ Brackets take two of the given width and are left off under three columns.
   Eighths of a cell (as `meter` uses) cannot show two colours meeting inside one cell.
 - **Alternatives:** eighths for the last segment only; width given without the brackets (what
   marshal's bars take).
+
+## 0.2.1: closing the gaps marshal's `top` drew by hand
+
+Each of these is **Proposed** (branch `tui-021`): built so that a port of marshal's `top` can draw
+its memory bar, footer, log header, LABEL column and log pane with tui and look byte for byte as it
+does now. Every new parameter defaults to the 0.2.0 behaviour.
+
+### Gauge boundaries: the product before the quotient (bug fix) — **Proposed**
+
+`gaugeCells` rounded `sum / budget * width + 0.5`, so 15 of 22 in 11 cells (exactly 7.5) came out
+7.4999… and rounded down. It now rounds `sum * width / budget + 0.5`: with whole amounts the product
+is exact, and a quotient that is exactly a half is representable, so it rounds up.
+
+- **Why:** an exact half must round the same way whatever the budget; top's `unitBar` already
+  avoids the quotient by counting in integers.
+- **Alternatives:** integer amounts (`Segment.amount` is a `real`, and memory is not whole cells);
+  rounding with an epsilon (moves the error rather than removing it).
+
+### Gauge eighths: `eighths = true`; an overlay is two segments end to end — **Proposed**
+
+`gauge(..., eighths = true)` and `gaugeEighths` place each boundary at the nearest eighth of a
+cell. A cell is drawn by the segment its left edge falls in: whole in the segment's character, or a
+left block of the eighths it covers, in the segment's colour over `empty`'s background (as `meter`
+draws its last cell). A segment beginning inside a cell shows from the next one. top's memory bar,
+held in blue with the reserved part in cyan over it, is `[reserved, held - reserved]`: the negative
+second amount when nothing is held beyond the reservation takes no cells, as top's `if held >
+reserved` does. A test draws top's two-meter bar and the gauge side by side for every case of five
+budgets, twelve widths and every reserved/held pair, and compares every cell.
+
+- **Why:** the overlay top draws is exactly the end-to-end layout; a separate overlay segment would
+  be a second way to say the same thing. Drawing a part cell over `empty`'s background (not the next
+  segment's) is what top's bar shows, and what a terminal can show: one cell has one foreground.
+- **Alternatives:** an `Overlay(amount, style)` segment kind; the part cell's background taken from
+  the next segment (two colours in one cell, but not top's look); partial blocks only for `█`
+  segments. Exact halves of an eighth now round up where top's quotient-first rounding could round
+  down, so the port differs from today's top only there, in the fix's favour.
+
+### Key hints: `sep`, `gap` and `cut` — **Proposed**
+
+`keyHints(..., sep = 1, gap = 2, cut = false)`: the blanks after a key and between hints, and
+whether the last hint that does not fit is cut at the edge (every hint drawn, clipped, the answer
+counting all of them, as `text` does) instead of left out. top's footer is `sep = 0, gap = 0, cut =
+true`, the key bold and the word with its trailing space black on cyan.
+
+- **Why:** three parameters say everything top's loop does; the blanks are not drawn, so a bar like
+  top's carries its spaces in the words, in their style.
+- **Alternatives:** a style for the gaps (top needs none); a `Span` list per hint (more general,
+  but `spans` already is that).
+
+### `wrapChars` and `Overflow.WrapChars` — **Proposed**
+
+Breaks each `\n`-separated line between any two clusters, filling each row, dropping and adding
+nothing, so the rows of a line joined are that line: top's command and label in the log header.
+Measured in columns by cluster, so a wide character is never split; for ASCII it is top's
+`wrapText` exactly. Width 0 or less gives no lines, as `wrap` does (top passes at least 1).
+
+- **Why:** a break at a space in a command line reads as part of the command; top relies on the
+  rows rejoining to the text.
+- **Alternatives:** a `breakAnywhere` flag on `wrap`; counting characters rather than columns (what
+  top does; wrong for CJK). Adding a variant to `Overflow` breaks an exhaustive `match` on it in a
+  program; none is known, and the brief named this shape.
+
+### Column `max`, `fit` and `keep` — **Proposed**
+
+`max` caps a flexible column (what it gives up is shared again among the others, or left blank when
+all are capped) and a fit column. `fit = true` sizes a column to its widest cell in the rows drawn,
+between `min` (at least 1) and `max`, ignoring `width` and `flex`. Fit columns give way to the
+flexible ones: the flexible columns are laid out as if no fit column were there, then each fit
+column, the last first, is narrowed toward its `min` until every flexible column has `max(min,
+keep)`, and left out (with its blank column) where that would take it under its `min`; a fit column
+with nothing in it is left out. `keep` is separate from `min` because a flexible column is dropped
+for want of its `min`, while top's COMMAND is never dropped but has LABEL leave it 20 cells. A test
+compares the widths with top's `labelWidth` + a fixed LABEL for every width up to 150 and every label
+length up to 31. `widths(width, rows)` is new, beside `widths(width)`.
+
+- **Why:** top's LABEL rule (as wide as the longest label, 5 to 24, dropped when it would leave
+  COMMAND under 20, absent when no job has a label) becomes three declarations.
+- **Alternatives:** a priority per column for dropping; fit counting the heading (top sets `min`
+  to the heading's width instead); `keep` on the fit column as "leave this much" (it is the flexible
+  column's need, so it sits there).
+
+### ScrollView: `fromEnd`, `back`, `backLimit`, `overlap` — **Proposed**
+
+With `fromEnd = true` the position is `back`, lines back from the end, kept as lines are added;
+`follow` is `back == 0`; Home goes as far back as allowed. `back` is held to the lines at the last
+draw, or with `backLimit >= 0` to that alone, because top reads only the last `rows + back` lines and
+must be able to ask for more than it has read. `overlap` is what a page leaves in view (1 by default;
+top pages by the whole pane, 0). A test drives top's hand-written pane and the view through the same
+keys with lines arriving between them and compares every frame and `back`.
+
+- **Why:** top counts "N lines back" because it tails a file; anchoring at the top would need the
+  whole log's length.
+- **Alternatives:** a separate `TailView` class (a second pager with the same keys); a page size in
+  lines rather than an overlap (wrong once the pane is resized).

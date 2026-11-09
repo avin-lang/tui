@@ -4,8 +4,17 @@ module dev.avinlang.tui
 // centred, 1 right. A width of 0 makes it flexible: it takes a share of what the columns of fixed
 // width leave, in proportion to its `flex` weight, after every flexible column has been given its
 // `min`. A flexible column whose `min` there is no room for is left out, with the blank column before
-// it; the columns after it are dropped first.
-data Column(title: string, width: int, align: int = -1, min: int = 0, flex: int = 1)
+// it; the columns after it are dropped first. A flexible column is never wider than `max`, where that
+// is more than 0; what it would have taken past it goes to the other flexible columns, or is left
+// blank at the right where every one of them is at its `max`.
+//
+// With `fit` the column is as wide as the widest of its cells in the rows drawn, held between `min`
+// (at least 1) and `max` (where that is more than 0), and its `width` and `flex` are not used. A fit
+// column gives way to the flexible columns: it is narrowed, down to its `min`, so that each of them
+// still has `keep` columns or its `min`, whichever is more, and where that would take it under its
+// `min` it is left out, with its blank column, the last fit column first. A fit column with nothing in
+// any of its cells is left out.
+data Column(title: string, width: int, align: int = -1, min: int = 0, flex: int = 1, max: int = 0, fit: bool = false, keep: int = 0)
 
 // A table of rows of text under a line of headings, one row selected, scrolled to keep the selected
 // row in view. It keeps only the selection and the scroll: the rows are given to `draw` each frame,
@@ -32,57 +41,119 @@ class Table(val columns: Vector[Column])
     var header = true
 
     // The widths the columns take in `width` columns, with one blank column between two; 0 for a
-    // column left out.
-    widths(width: int) -> Vector[int] = layout(width).map(w -> maxOf(w, 0))
+    // column left out. A fit column is measured against no rows, so it is left out.
+    widths(width: int) -> Vector[int] = layout(width, Vector.fill(columns.length(), 0)).map(w -> maxOf(w, 0))
 
-    // The widths, -1 for a flexible column left out for want of room for its `min`.
-    private layout(width: int) -> Vector[int]
+    // The widths the columns take in `width` columns with `rows` drawn in them, fit columns measured
+    // against those rows; 0 for a column left out.
+    widths(width: int, rows: Vector[Vector[Span]]) -> Vector[int] = layout(width, contentWidths(rows)).map(w -> maxOf(w, 0))
+
+    // The widest cell of each column in `rows`.
+    private contentWidths(rows: Vector[Vector[Span]]) -> Vector[int]
+        val widest = Array.fill(columns.length(), 0)
+        for row in rows
+            for j in 0 ..< minOf(row.length(), columns.length())
+                if columns(j).fit then widest(j) = maxOf(widest(j), textWidth(row(j).text))
+        widest.toVector()
+
+    // The widths, -1 for a column left out: a flexible one for want of room for its `min`, a fit one
+    // for want of room or of anything in it. `content` is the widest cell of each column.
+    private layout(width: int, content: Vector[int]) -> Vector[int]
         val n = columns.length()
         if n == 0 then return Vector[int]()
         val shown = Array.fill(n, true)
         var fixed = 0
         for c in columns
-            if c.width > 0 then fixed += c.width
-        var spare = 0
-        var weights = 0
+            if !c.fit && c.width > 0 then fixed += c.width
+        // The flexible columns are fitted first, as if no fit column were there.
         loop
             var active = 0
             var mins = 0
-            weights = 0
             var last = -1
             for j in 0 ..< n
-                if shown(j)
+                val c = columns(j)
+                if shown(j) && !c.fit
                     active += 1
-                    val c = columns(j)
                     if c.width <= 0
                         mins += maxOf(c.min, 0)
-                        weights += maxOf(c.flex, 0)
                         if c.min > 0 then last = j
-            spare = maxOf(width - fixed - (active - 1), 0)
-            if mins <= spare || last < 0 then break
+            if mins <= maxOf(width - fixed - (active - 1), 0) || last < 0 then break
             shown(last) = false
-        // What the minimums leave is shared by weight, the last weighted column taking what dividing
-        // leaves over.
-        var rest = spare
-        for j in 0 ..< n
-            if shown(j) && columns(j).width <= 0 then rest -= maxOf(columns(j).min, 0)
-        rest = maxOf(rest, 0)
-        val out = Vector.newBuilder[int]()
-        var seen = 0
-        var given = 0
+        // Then the fit columns, each its widest cell between its `min` and `max`, narrowed or left out,
+        // the last first, until the flexible columns keep what they ask.
+        val fitted = Array.fill(n, 0)
         for j in 0 ..< n
             val c = columns(j)
-            if c.width > 0
-                out.addOne(c.width)
-            else if !shown(j)
-                out.addOne(-1)
-            else
-                val w = maxOf(c.flex, 0)
-                seen += w
-                val share = if weights == 0 || w == 0 then 0 else if seen == weights then rest - given else rest * w / weights
-                given += share
-                out.addOne(maxOf(c.min, 0) + share)
+            if c.fit
+                if content(j) <= 0 then shown(j) = false
+                else fitted(j) = minOf(maxOf(content(j), fitMin(c)), cap(c))
+        var j = n - 1
+        while j >= 0
+            if columns(j).fit && shown(j)
+                val over = taken(shown, fitted, fixed) - width
+                if over <= 0 then break
+                if fitted(j) - over >= fitMin(columns(j)) then fitted(j) -= over
+                else shown(j) = false
+            j -= 1
+        var count = 0
+        var fitSum = 0
+        for k in 0 ..< n
+            if shown(k)
+                count += 1
+                if columns(k).fit then fitSum += fitted(k)
+        val spare = maxOf(width - fixed - fitSum - (count - 1), 0)
+        // What the minimums leave is shared by weight, the last weighted column taking what dividing
+        // leaves over; a column whose share would take it past its `max` is held there and the rest
+        // shared again among the others.
+        var rest = spare
+        for k in 0 ..< n
+            if shown(k) && flexible(columns(k)) then rest -= maxOf(columns(k).min, 0)
+        rest = maxOf(rest, 0)
+        val held = Array.fill(n, false)
+        val share = Array.fill(n, 0)
+        loop
+            var weights = 0
+            for k in 0 ..< n
+                if shown(k) && flexible(columns(k)) && !held(k) then weights += maxOf(columns(k).flex, 0)
+            var seen = 0
+            var given = 0
+            for k in 0 ..< n
+                val c = columns(k)
+                if shown(k) && flexible(c) && !held(k)
+                    val w = maxOf(c.flex, 0)
+                    seen += w
+                    share(k) = if weights == 0 || w == 0 then 0 else if seen == weights then rest - given else rest * w / weights
+                    given += share(k)
+            var again = false
+            for k in 0 ..< n
+                val c = columns(k)
+                if shown(k) && flexible(c) && !held(k) && maxOf(c.min, 0) + share(k) > cap(c)
+                    held(k) = true
+                    share(k) = cap(c) - maxOf(c.min, 0)
+                    rest -= share(k)
+                    again = true
+            if !again then break
+        val out = Vector.newBuilder[int]()
+        for k in 0 ..< n
+            val c = columns(k)
+            if !shown(k) then out.addOne(-1)
+            else if c.fit then out.addOne(fitted(k))
+            else if c.width > 0 then out.addOne(c.width)
+            else out.addOne(maxOf(c.min, 0) + share(k))
         out.result()
+
+    // The columns the shown ones take with the fit columns at `fitted` and each flexible column at
+    // what it keeps, blanks between included.
+    private taken(shown: Array[bool], fitted: Array[int], fixed: int) -> int
+        var sum = fixed
+        var count = 0
+        for j in 0 ..< columns.length()
+            if shown(j)
+                count += 1
+                val c = columns(j)
+                if c.fit then sum += fitted(j)
+                else if c.width <= 0 then sum += maxOf(maxOf(c.min, c.keep), 0)
+        sum + maxOf(count - 1, 0)
 
     // Draws the headings on the first row of `r` and as many rows as fit under them, scrolling first
     // so the selected row is shown. A row with fewer cells than there are columns leaves the rest
@@ -104,7 +175,7 @@ class Table(val columns: Vector[Column])
             if visible > 0 && selected >= offset + visible then offset = selected - visible + 1
         if offset > maxOf(count - visible, 0) then offset = maxOf(count - visible, 0)
         if offset < 0 then offset = 0
-        val ws = layout(r.w)
+        val ws = layout(r.w, contentWidths(rows))
         if header then line(g, r, r.y, columns.map(c -> Span(c.title)), ws, headerStyle, 0)
         for k in 0 ..< visible
             val i = offset + k
@@ -126,3 +197,12 @@ class Table(val columns: Vector[Column])
                 None -> style
             g.textIn(x, y, ws(j), cell.text, s, columns(j).align, r)
             x += ws(j) + 1
+
+// Whether `c` takes a share of the room the others leave.
+private flexible(c: Column) -> bool = !c.fit && c.width <= 0
+
+// The fewest columns a fit column is drawn in.
+private fitMin(c: Column) -> int = maxOf(c.min, 1)
+
+// The most columns `c` takes: its `max`, never under its `min`, or no limit.
+private cap(c: Column) -> int = if c.max > 0 then maxOf(c.max, fitMin(c)) else int.MaxValue

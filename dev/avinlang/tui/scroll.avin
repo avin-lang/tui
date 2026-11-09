@@ -8,6 +8,13 @@ module dev.avinlang.tui
 // last lines, however many have been added since; a move up stops following, and a move that reaches
 // the end starts again. While it does not follow, the line at the top stays where it is as lines are
 // added below.
+//
+// With `fromEnd` it is anchored at the bottom instead: its position is `back`, how many lines the last
+// line shown is before the last line, and every draw keeps that, so the lines shown move up as lines
+// are added; `follow` is then whether `back` is 0. `back` is held to the lines at the last draw, or,
+// where `backLimit` is 0 or more, to that alone: for a program that reads only the last `back + rows`
+// lines of something longer, which has to be able to ask for more lines back than it has read yet.
+// The lines shown are held to the lines there are either way.
 class ScrollView()
     // The first line shown, counted from 0.
     var offset = 0
@@ -16,6 +23,14 @@ class ScrollView()
     // The lines and the rows at the last draw.
     var count = 0
     var rows = 1
+    // Whether the view is anchored at the bottom, how many lines back from the end it is when it is,
+    // and the most lines back it may go (-1: the lines there are).
+    var fromEnd = false
+    var back = 0
+    var backLimit = -1
+    // The lines a page leaves in view from the one before it: 1 by default, 0 to page by the whole
+    // view.
+    var overlap = 1
 
     // The largest offset, for `count` lines in `rows` rows.
     maxOffset() -> int = maxOf(count - rows, 0)
@@ -25,26 +40,43 @@ class ScrollView()
 
     // Scrolls `n` lines down, or up for a negative `n`, held to the lines there are.
     scrollBy(n: int)
-        scrollTo(offset + n)
+        if fromEnd then backTo(back - n) else scrollTo(offset + n)
 
     // Puts line `i` at the top, held to the lines there are; following stops unless that shows the end.
     scrollTo(i: int)
+        if fromEnd
+            backTo(maxOffset() - (if i < 0 then 0 else i))
+            return
         offset = if i < 0 then 0 else if i > maxOffset() then maxOffset() else i
         follow = atEnd()
 
+    // How many lines a page moves: the rows less `overlap`, at least one.
+    pageSize() -> int = maxOf(rows - maxOf(overlap, 0), 1)
+
     lineUp() = scrollBy(-1)
     lineDown() = scrollBy(1)
-    pageUp() = scrollBy(-maxOf(rows - 1, 1))
-    pageDown() = scrollBy(maxOf(rows - 1, 1))
-    home() = scrollTo(0)
+    pageUp() = scrollBy(-pageSize())
+    pageDown() = scrollBy(pageSize())
+
+    // Shows the first line: the top, or with `fromEnd` as far back as it may go.
+    home()
+        if fromEnd then backTo(int.MaxValue) else scrollTo(0)
 
     // Shows the last line and follows the end from now on.
     toEnd()
         offset = maxOffset()
         follow = true
+        back = 0
+
+    // Sets `back` to `b`, held to 0 and the most it may be, and the offset to match.
+    private backTo(b: int)
+        val most = if backLimit >= 0 then backLimit else maxOffset()
+        back = if b < 0 then 0 else if b > most then most else b
+        offset = maxOf(count - rows - back, 0)
+        follow = back == 0
 
     // Moves for the keys a pager has: the arrows up and down by a line, Page Up and Page Down by a
-    // page less one line, Home and End to the ends. Answers whether `k` was one of them.
+    // page (the rows less `overlap`), Home and End to the ends. Answers whether `k` was one of them.
     handle(k: Key) -> bool
         k match
             Up -> lineUp()
@@ -60,6 +92,13 @@ class ScrollView()
     fit(lineCount: int, rowCount: int)
         count = maxOf(lineCount, 0)
         rows = maxOf(rowCount, 1)
+        if fromEnd
+            if back < 0 then back = 0
+            if backLimit < 0 && back > maxOffset() then back = maxOffset()
+            if backLimit >= 0 && back > backLimit then back = backLimit
+            offset = maxOf(count - rows - back, 0)
+            follow = back == 0
+            return
         if follow || offset > maxOffset() then offset = maxOffset()
         if offset < 0 then offset = 0
 
@@ -93,13 +132,14 @@ class LogView(val limit: int = 10000)
         while held.length() > maxOf(limit, 1)
             held.removeHead()
             dropped += 1
-        if dropped > 0 && !view.follow then view.offset = maxOf(view.offset - dropped, 0)
+        if dropped > 0 && !view.follow && !view.fromEnd then view.offset = maxOf(view.offset - dropped, 0)
 
     // Forgets every line and follows the end again.
     clear()
         held.clear()
         view.offset = 0
         view.follow = true
+        view.back = 0
 
     // Moves the view for a pager's keys, as `ScrollView.handle`.
     handle(k: Key) -> bool = view.handle(k)

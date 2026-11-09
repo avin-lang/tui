@@ -6,27 +6,46 @@ data Segment(amount: real, style: Style, ch: char = '█')
 
 // The cells each segment fills out of `width`, for `segments` laid end to end against `budget`.
 //
-// Each boundary is placed at the nearest cell to where the segments up to it end, so the cells add up
-// as the amounts do and no rounding is lost or counted twice; what passes the budget is cut off at the
-// end. A negative amount, or one that is not a number, takes no cells; so does everything when the
-// budget is 0 or less.
-gaugeCells(width: int, segments: Vector[Segment], budget: real) -> Vector[int]
+// Each boundary is placed at the nearest cell to where the segments up to it end, an exact half
+// rounding up, so the cells add up as the amounts do and no rounding is lost or counted twice; what
+// passes the budget is cut off at the end. A negative amount, or one that is not a number, takes no
+// cells; so does everything when the budget is 0 or less.
+gaugeCells(width: int, segments: Vector[Segment], budget: real) -> Vector[int] =
+    steps(boundaries(maxOf(width, 0), segments, budget))
+
+// The eighths of a cell each segment fills out of `width` cells, placed as `gaugeCells` places whole
+// cells: each boundary at the nearest eighth to where the segments up to it end.
+gaugeEighths(width: int, segments: Vector[Segment], budget: real) -> Vector[int] =
+    steps(boundaries(maxOf(width, 0) * 8, segments, budget))
+
+// Where each segment ends, out of `units`, counted from the start.
+private boundaries(units: int, segments: Vector[Segment], budget: real) -> Vector[int]
     val out = Vector.newBuilder[int]()
-    val w = maxOf(width, 0)
     var sum = 0.0
-    var before = 0
     for s in segments
         if s.amount > 0.0 then sum += s.amount
-        val upTo = if budget > 0.0 && !budget.isNaN() then cellsAt(sum / budget, w) else 0
-        out.addOne(upTo - before)
-        before = upTo
+        out.addOne(unitsAt(sum, budget, units))
     out.result()
 
-// The nearest cell of `width` to `fraction` of it, held to the cells there are.
-private cellsAt(fraction: real, width: int) -> int
-    if fraction.isNaN() || fraction <= 0.0 then return 0
-    if fraction >= 1.0 then return width
-    int(fraction * real(width) + 0.5)
+// The differences between one boundary and the one before it, the first counted from 0.
+private steps(ends: Vector[int]) -> Vector[int]
+    val out = Vector.newBuilder[int]()
+    var before = 0
+    for e in ends
+        out.addOne(e - before)
+        before = e
+    out.result()
+
+// The nearest of `units` to `sum` out of `budget`, held to the units there are. The product is taken
+// before the quotient, so an amount that falls on an exact half of a unit is not pushed under it by
+// the rounding of `sum / budget`.
+private unitsAt(sum: real, budget: real, units: int) -> int
+    if budget.isNaN() || budget <= 0.0 || sum <= 0.0 then return 0
+    if sum >= budget then return units
+    int(sum * real(units) / budget + 0.5)
+
+// The blocks a partly filled cell of a gauge is drawn with, an eighth of a cell more each.
+private val gaugeBlocks: string = " ▏▎▍▌▋▊▉█"
 
 impl Grid
     // Draws a gauge from column `x` of row `y`, `width` columns in all: the segments one after another,
@@ -35,7 +54,14 @@ impl Grid
     // columns; a gauge under three columns wide gets none. A character not one column wide, for a
     // segment or for `rest`, is drawn as `█` or `·`, so every cell of the gauge is one column. Answers
     // the column after it.
-    gauge(x: int, y: int, width: int, segments: Vector[Segment], budget: real, empty: Style = Style.fg(BrightBlack), rest: char = '·', brackets: bool = true, frame: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)) -> int
+    //
+    // With `eighths` the segments are placed in eighths of a cell (see `gaugeEighths`). Each cell is
+    // drawn by the segment its left edge falls in: whole in the segment's character where the segment
+    // covers all of it, and otherwise as a left block of the eighths it covers (`▏` to `▉`) in the
+    // segment's colour over `empty`'s background, as `meter` draws its last cell. A segment that
+    // begins inside a cell shows from the next one, so a segment drawn over the start of another is
+    // two segments end to end: the inner one, then the rest of the outer.
+    gauge(x: int, y: int, width: int, segments: Vector[Segment], budget: real, empty: Style = Style.fg(BrightBlack), rest: char = '·', brackets: bool = true, frame: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue), eighths: bool = false) -> int
         if width <= 0 then return x
         val c = clip.intersect(area())
         val framed = brackets && width >= 3
@@ -44,14 +70,32 @@ impl Grid
         if framed
             cell(x, y, '[', frame, c)
             cell(x + width - 1, y, ']', frame, c)
+        val restCh = oneColumn(rest, '·')
+        if eighths
+            val ends = boundaries(inner * 8, segments, budget)
+            var j = 0
+            for i in 0 ..< inner
+                val start = i * 8
+                while j < ends.length() && ends(j) <= start
+                    j += 1
+                if j == ends.length()
+                    cell(left + i, y, restCh, empty, c)
+                else
+                    val s = segments(j)
+                    val covered = ends(j) - start
+                    if covered >= 8 then cell(left + i, y, oneColumn(s.ch, '█'), s.style, c)
+                    else cell(left + i, y, gaugeBlocks.chars()(covered), Style(s.style.fg, empty.bg, s.style.attrs), c)
+            return x + width
         var col = left
         for (s, n) in segments.zip(gaugeCells(inner, segments, budget))
-            val ch = if charWidth(s.ch) == 1 && !s.ch.isControl() then s.ch else '█'
+            val ch = oneColumn(s.ch, '█')
             for _ in 0 ..< n
                 cell(col, y, ch, s.style, c)
                 col += 1
-        val restCh = if charWidth(rest) == 1 && !rest.isControl() then rest else '·'
         while col < left + inner
             cell(col, y, restCh, empty, c)
             col += 1
         x + width
+
+// `ch` where it is one column wide and not a control character, and `instead` where it is not.
+private oneColumn(ch: char, instead: char) -> char = if charWidth(ch) == 1 && !ch.isControl() then ch else instead

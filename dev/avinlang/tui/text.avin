@@ -1,10 +1,12 @@
 module dev.avinlang.tui
 
 // How a block of text too long for its width is shown: `Wrap` breaks it into lines at spaces,
-// breaking a word wider than the line between two of its clusters; `Ellipsis` keeps each line of the
-// text on one row, cut with `…`.
+// breaking a word wider than the line between two of its clusters; `WrapChars` breaks it between any
+// two clusters, filling each line, so nothing is dropped (see `wrapChars`); `Ellipsis` keeps each line
+// of the text on one row, cut with `…`.
 data Overflow
     Wrap
+    WrapChars
     Ellipsis
 
 // `text` broken into lines of at most `width` columns, measured cluster by cluster.
@@ -38,6 +40,30 @@ private wrapLine(para: string, width: int, out: Builder[string, Vector[string]])
     if word.length() > 0 then rows.place(spaces, word)
     else if rows.isBlank() then rows.spaces(minOf(spaces, width))
     rows.newRow()
+
+// `text` broken into lines of at most `width` columns between any two clusters, each line filled as
+// far as the next cluster fits: for a command line or a path, where a break at a space would read as
+// part of it.
+//
+// Each line of the text (`\n` ends one) is broken on its own, and nothing else is dropped or added, so
+// the lines it is broken into, joined, are that line of the text. A two-column cluster in a width of 1
+// is given a line of its own, which it overflows. An empty text is one empty line; a width of 0 or
+// less has room for no line.
+wrapChars(text: string, width: int) -> Vector[string]
+    val out = Vector.newBuilder[string]()
+    if width <= 0 then return out.result()
+    for para in text.split("\n")
+        var row = StringWriter()
+        var used = 0
+        for c in clusters(para)
+            if used + c.width > width && used > 0
+                out.addOne(row.text())
+                row = StringWriter()
+                used = 0
+            row.write(c.text)
+            used += c.width
+        out.addOne(row.text())
+    out.result()
 
 // The rows one line of text is broken into, filled a word at a time.
 private class Wrapper(val width: int, val out: Builder[string, Vector[string]])
@@ -106,6 +132,7 @@ impl Grid
         if r.w <= 0 then return 0
         val lines = overflow match
             Wrap -> wrap(text, r.w)
+            WrapChars -> wrapChars(text, r.w)
             Ellipsis -> text.split("\n").map(l -> fitted(l, r.w)).toVector()
         val c = r.intersect(clip)
         val shown = minOf(lines.length(), maxOf(r.h, 0))
@@ -136,21 +163,27 @@ impl Grid
             col = text(col, y, p.text, p.style.getOrElse(style), clip)
         col
 
-    // Draws a row of key hints from column `x` of row `y`: each key in `keyStyle`, a space, what it does
-    // in `textStyle`, and two spaces before the next, as `q quit  ↑↓ move`. A hint that would not fit
-    // whole inside `clip` and the grid is left out with every hint after it. Answers the column after
-    // the last hint drawn.
-    keyHints(x: int, y: int, hints: Vector[(string, string)], keyStyle: Style = Style.plain().with(Bold), textStyle: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)) -> int
+    // Draws a row of key hints from column `x` of row `y`: each key in `keyStyle`, `sep` blank columns,
+    // what it does in `textStyle`, and `gap` blank columns before the next, as `q quit  ↑↓ move` with
+    // the defaults. A hint with nothing to say is its key alone, with no `sep` after it. The blanks are
+    // left as they are, not drawn.
+    //
+    // A hint that would not fit whole inside `clip` and the grid is left out with every hint after
+    // it, and the answer is the column after the last hint drawn. With `cut`, every hint is drawn and
+    // cut at the edge instead, as text is, and the answer is the column after the last of them as if
+    // all were shown, which may be past the edge.
+    keyHints(x: int, y: int, hints: Vector[(string, string)], keyStyle: Style = Style.plain().with(Bold), textStyle: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue), sep: int = 1, gap: int = 2, cut: bool = false) -> int
         val c = clip.intersect(area())
+        val between = maxOf(sep, 0)
         var col = x
         var first = true
         for (key, what) in hints
-            val gap = if first then 0 else 2
-            val w = textWidth(key) + (if what.isEmpty() then 0 else 1 + textWidth(what))
-            if col + gap + w > c.right() then break
-            col += gap
+            val before = if first then 0 else maxOf(gap, 0)
+            val w = textWidth(key) + (if what.isEmpty() then 0 else between + textWidth(what))
+            if !cut && col + before + w > c.right() then break
+            col += before
             col = text(col, y, key, keyStyle, c)
-            if what.nonEmpty() then col = text(col + 1, y, what, textStyle, c)
+            if what.nonEmpty() then col = text(col + between, y, what, textStyle, c)
             first = false
         col
 
