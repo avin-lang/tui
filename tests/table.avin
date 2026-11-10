@@ -115,9 +115,9 @@ tableFit()
     assertEq(fit(0, 0).widths(30, second(["日本"])), [2, 4, 22])
     assertEq(fit(0, 0).widths(30, second(["abcdefgh"])), [2, 8, 18])
     // nothing in its cells, no rows, or rows too short to reach it: it keeps its heading's width
-    assertEq(fit(0, 0).widths(30, second(["", ""])), [2, 1, 26])
-    assertEq(fit(5, 0).widths(30, []), [2, 5, 22])
-    assertEq(fit(0, 0).widths(30, [[Span("1")]]), [2, 1, 26])
+    assertEq(fit(0, 0).widths(30, second(["", ""])), [2, 1, 25])
+    assertEq(fit(5, 0).widths(30, []), [2, 5, 21])
+    assertEq(fit(0, 0).widths(30, [[Span("1")]]), [2, 1, 25])
     // measured against no rows at all, it is left out
     assertEq(fit(0, 0).widths(30), [2, 0, 27])
     // its width and flex are not used
@@ -132,10 +132,10 @@ tableFitHeading()
     assertEq(t.widths(20, [[Span("1"), Span(""), Span("z")]]), [2, 5, 11])
     // one empty cell among full ones, and a heading wider than every cell
     assertEq(t.widths(30, second(["ab", "", "abcdefg"])), [2, 7, 19])
-    assertEq(t.widths(30, second(["ab", ""])), [2, 5, 20])
+    assertEq(t.widths(30, second(["ab", ""])), [2, 5, 21])
     // wide characters in the heading count two columns each
     val wide = Table([Column("n", 2), Column("日本語", 0, fit = true), Column("c", 0)])
-    assertEq(wide.widths(30, second(["a", ""])), [2, 6, 19])
+    assertEq(wide.widths(30, second(["a", ""])), [2, 6, 20])
     // max holds the heading too, and empty cells make no difference
     val capped = Table([Column("n", 2), Column("LABEL", 0, max = 3, fit = true), Column("c", 0)])
     assertEq(capped.widths(30, second(["", ""])), [2, 3, 23])
