@@ -102,9 +102,9 @@ t.drawSpans(g, body, jobs.map(j -> [Span(j.id.toString()), Span(j.state, Some(St
 `header = false` leaves the headings out; `draw` with rows of strings works as before.
 
 `max` holds a flexible column to at most that many columns, what it gives up going to the others.
-`fit = true` sizes a column to its widest cell in the rows drawn, between `min` and `max`; it gives
-way to the flexible columns, narrowed down to its `min` so each keeps its `keep` (or its `min`), then
-left out, as is a fit column with nothing in it. `widths(width, rows)` answers the widths a draw of
+`fit = true` sizes a column to the widest of its heading and its cells in the rows drawn, between
+`min` and `max`; it gives way to the flexible columns, narrowed down to its `min` so each keeps its
+`keep` (or its `min`), then left out, as is a fit column with no heading text and nothing in it. `widths(width, rows)` answers the widths a draw of
 those rows would use.
 
 ```text

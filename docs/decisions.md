@@ -322,6 +322,14 @@ length up to 31. `widths(width, rows)` is new, beside `widths(width)`.
   to the heading's width instead); `keep` on the fit column as "leave this much" (it is the flexible
   column's need, so it sits there).
 
+### A fit column counts its heading
+
+A fit column is as wide as the widest of its heading (where `header` is on) and its cells, so a column
+with a heading and all-empty cells keeps the heading's width instead of vanishing; top had given its
+empty LABEL cells a one-space value to keep the column on screen. A column with no heading text and no
+cells is still left out, and `widths(width)` (no rows) still leaves a fit column out. This replaces the
+"fit counting the heading" alternative rejected above.
+
 ### ScrollView: `fromEnd`, `back`, `backLimit`, `overlap`
 
 With `fromEnd = true` the position is `back`, lines back from the end, kept as lines are added;

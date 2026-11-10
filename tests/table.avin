@@ -114,13 +114,42 @@ tableFit()
     assertEq(fit(6, 3).widths(30, second(["ab"])), [2, 6, 20])
     assertEq(fit(0, 0).widths(30, second(["日本"])), [2, 4, 22])
     assertEq(fit(0, 0).widths(30, second(["abcdefgh"])), [2, 8, 18])
-    // nothing in it, no rows, or rows too short to reach it: left out with its blank column
-    assertEq(fit(0, 0).widths(30, second(["", ""])), [2, 0, 27])
-    assertEq(fit(5, 0).widths(30, []), [2, 0, 27])
+    // nothing in its cells, no rows, or rows too short to reach it: it keeps its heading's width
+    assertEq(fit(0, 0).widths(30, second(["", ""])), [2, 1, 26])
+    assertEq(fit(5, 0).widths(30, []), [2, 5, 22])
+    assertEq(fit(0, 0).widths(30, [[Span("1")]]), [2, 1, 26])
+    // measured against no rows at all, it is left out
     assertEq(fit(0, 0).widths(30), [2, 0, 27])
-    assertEq(fit(0, 0).widths(30, [[Span("1")]]), [2, 0, 27])
     // its width and flex are not used
     assertEq(Table([Column("L", 9, flex = 5, fit = true), Column("c", 0)]).widths(20, [[Span("abc")]]), [3, 16])
+
+@test("a fit column is as wide as the widest of its heading and its cells")
+tableFitHeading()
+    val t = Table([Column("n", 2), Column("LABEL", 0, fit = true), Column("c", 0)])
+    val g = Grid(20, 2)
+    t.drawSpans(g, g.area(), [[Span("1"), Span(""), Span("z")]])
+    assertEq(rows(g), ["n  LABEL c          ", "1        z          "])
+    assertEq(t.widths(20, [[Span("1"), Span(""), Span("z")]]), [2, 5, 11])
+    // one empty cell among full ones, and a heading wider than every cell
+    assertEq(t.widths(30, second(["ab", "", "abcdefg"])), [2, 7, 19])
+    assertEq(t.widths(30, second(["ab", ""])), [2, 5, 20])
+    // wide characters in the heading count two columns each
+    val wide = Table([Column("n", 2), Column("日本語", 0, fit = true), Column("c", 0)])
+    assertEq(wide.widths(30, second(["a", ""])), [2, 6, 19])
+    // max holds the heading too, and empty cells make no difference
+    val capped = Table([Column("n", 2), Column("LABEL", 0, max = 3, fit = true), Column("c", 0)])
+    assertEq(capped.widths(30, second(["", ""])), [2, 3, 23])
+    assertEq(capped.widths(30, second(["abcdefg"])), [2, 3, 23])
+    // no heading and no content: left out
+    assertEq(Table([Column("n", 2), Column("", 0, fit = true), Column("c", 0)]).widths(30, second(["", ""])), [2, 0, 27])
+    // with the headings off, the heading does not count
+    val bare = Table([Column("n", 2), Column("LABEL", 0, fit = true), Column("c", 0)])
+    bare.header = false
+    assertEq(bare.widths(30, second(["", ""])), [2, 0, 27])
+    // on a narrow screen it is narrowed, then left out, as any fit column is
+    val keeps = Table([Column("n", 2), Column("LABEL", 0, fit = true), Column("c", 0, keep = 4)])
+    assertEq(keeps.widths(10, second(["", ""])), [2, 2, 4])
+    assertEq(keeps.widths(7, second(["", ""])), [2, 0, 4])
 
 @test("a fit column gives way to the flexible ones, narrowed to its min and then left out")
 tableFitGivesWay()
@@ -163,7 +192,6 @@ tableFitDraws()
 
 // The LABEL column's width as marshal top works it out by hand.
 topLabelWidth(base: Vector[Column], width: int, longest: int) -> int
-    if longest <= 0 then return 0
     var fixed = 0
     for c in base
         fixed += c.width
