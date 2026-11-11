@@ -343,3 +343,25 @@ keys with lines arriving between them and compares every frame and `back`.
   whole log's length.
 - **Alternatives:** a separate `TailView` class (a second pager with the same keys); a page size in
   lines rather than an overlap (wrong once the pane is resized).
+
+## Proposed: a vertical scrollbar, opt-in on `Table` and `ScrollView`
+
+**Proposed** (branch `scrollbar`), for marshal top's job list. `g.scrollbar(r, total, first, shown,
+bar = Scrollbar())` draws a track of `│` with a thumb of `█` over it, in whole cells; `scrollThumb`
+answers the thumb's first cell and size. The thumb is `height * shown / total` rounded, at least 1;
+it is at the top only where `first` is 0 and at the bottom only where the last item is shown, and
+between them placed in proportion and held one cell off each end. With only two places (a travel of
+one cell) it leaves the top only at the end. Nothing is drawn while everything fits. `Table` and
+`ScrollView` have `var scrollbar: Option[Scrollbar] = None`; set, the bar takes the right column only
+while the rows do not fit (a table's beside its rows, the heading row keeping its full width), so
+a table that fits is cell for cell as without it, and existing programs change in nothing.
+
+- **Why:** a thumb at an end must mean "at the end", or a list one row from the top looks unscrolled;
+  rounding alone puts it there for long lists. Taking the column only when shown keeps every table
+  that fits as it is. An `Option` of the style carries both "on" and how it looks in one field.
+- **Alternatives:** eighth-cell thumbs: the gauge's eighths are left blocks, and a vertical thumb
+  would need lower blocks for its top edge and upper ones for its bottom, which Unicode has only as
+  `▔` and `▀` (reversed lower blocks would need the track's colour as a background); a plain track
+  while everything fits (a column always taken, so the layout would move when the option is turned
+  on); a `bool` flag plus separate style fields. A `ScrollView` with `fromEnd` and `backLimit` is
+  given only the lines it reads, so its bar measures those, not the whole log.

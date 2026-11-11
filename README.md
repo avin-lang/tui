@@ -69,6 +69,7 @@ avin test examples/top
 | Layout | `Rect.rows`, `Rect.columns` by `Fixed`, `Fraction` and `Fill`; `shrink`, `pad`, `centered`. |
 | `Table` | Headings, rows given at each `draw`, a selected row kept in view by scrolling; fixed and flexible columns with minimums and weights, cells in their own styles. |
 | `ScrollView`, `LogView` | A window over lines that follows the end, with the pager's keys. |
+| `g.scrollbar` | A vertical scrollbar, drawn by a table or scroll view on its right edge when asked. |
 | Text | `wrap`, `g.textBlock` (wrapped or cut with `…`), `g.spans`, `g.hline`, `g.vline`, `g.keyHints`, `g.labelValues`. |
 | `ModalStack` | Boxes over the screen that take the input: `MessageBox`, `Confirm`, or a `Modal` of your own. |
 | `g.gauge` | A bar of coloured segments against a budget, between brackets. |
@@ -136,6 +137,23 @@ view.fromEnd = true
 view.overlap = 0
 view.backLimit = 10000
 view.draw(g, pane, readLastLines(log, pane.h + view.back))
+```
+
+## Scrollbar
+
+`g.scrollbar(r, total, first, shown)` draws a vertical bar down the first column of `r` for `total`
+items of which `shown` are visible from `first` on: a track of `│` and a thumb of `█`, in whole
+cells. The thumb is in proportion to what is shown, at least one cell; it touches the top only at
+the start and the bottom only at the end. Nothing is drawn while everything fits. `scrollThumb`
+answers where the thumb is, and a `Scrollbar` gives the characters and styles.
+
+A `Table` or `ScrollView` (and so a `LogView`, through its `view`) draws one down its right edge
+when its `scrollbar` is set and its rows do not fit, taking that column from its width only then;
+it is `None` by default, and a table that fits draws exactly as without it.
+
+```text
+t.scrollbar = Some(Scrollbar())
+log.view.scrollbar = Some(Scrollbar(track = Style.fg(BrightBlack), thumb = Style.fg(Cyan)))
 ```
 
 ## Text

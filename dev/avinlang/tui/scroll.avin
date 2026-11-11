@@ -31,6 +31,9 @@ class ScrollView()
     // The lines a page leaves in view from the one before it: 1 by default, 0 to page by the whole
     // view.
     var overlap = 1
+    // The bar drawn down the right edge while there are more lines than rows; it takes its column
+    // from the lines' width only then. `None`, the default, draws none.
+    var scrollbar: Option[Scrollbar] = None
 
     // The largest offset, for `count` lines in `rows` rows.
     maxOffset() -> int = maxOf(count - rows, 0)
@@ -108,8 +111,18 @@ class ScrollView()
         if r.isEmpty() then return
         fit(lines.length(), r.h)
         g.fill(r.x, r.y, r.w, r.h, style)
+        val body = drawBar(g, r)
         for k in 0 ..< minOf(r.h, count - offset)
-            g.text(r.x, r.y + k, lines(offset + k), style, r)
+            g.text(r.x, r.y + k, lines(offset + k), style, body)
+
+    // Draws the scrollbar down the right column of `r`, where there is one and the lines at the last
+    // `fit` do not fit, and answers what is left of `r` for the lines.
+    drawBar(g: Grid, r: Rect) -> Rect
+        val bar = if count > rows && r.w >= 2 then scrollbar else None
+        bar match
+            Some(b) -> g.scrollbar(Rect(r.right() - 1, r.y, 1, r.h), count, offset, rows, b)
+            None -> return r
+        Rect(r.x, r.y, r.w - 1, r.h)
 
 // A log: lines added at the end, at most `limit` of them kept, the oldest dropped first, shown in a
 // `ScrollView`. Text added is cut into lines at `\n`. While the view does not follow the end, lines
@@ -149,5 +162,6 @@ class LogView(val limit: int = 10000)
         if r.isEmpty() then return
         view.fit(held.length(), r.h)
         g.fill(r.x, r.y, r.w, r.h, style)
+        val body = view.drawBar(g, r)
         for k in 0 ..< minOf(r.h, held.length() - view.offset)
-            g.text(r.x, r.y + k, held(view.offset + k), style, r)
+            g.text(r.x, r.y + k, held(view.offset + k), style, body)

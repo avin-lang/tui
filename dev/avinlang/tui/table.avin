@@ -41,6 +41,10 @@ class Table(val columns: Vector[Column])
     // Whether the first row of the rectangle drawn in holds the headings.
     var header = true
 
+    // The bar drawn down the right edge, beside the rows under the headings, while there are more rows
+    // than fit; it takes its column from the table's width only then. `None`, the default, draws none.
+    var scrollbar: Option[Scrollbar] = None
+
     // The widths the columns take in `width` columns, with one blank column between two; 0 for a
     // column left out. A fit column is measured against no rows, so it is left out.
     widths(width: int) -> Vector[int] = layout(width, Vector.fill(columns.length(), 0)).map(w -> maxOf(w, 0))
@@ -179,14 +183,21 @@ class Table(val columns: Vector[Column])
             if visible > 0 && selected >= offset + visible then offset = selected - visible + 1
         if offset > maxOf(count - visible, 0) then offset = maxOf(count - visible, 0)
         if offset < 0 then offset = 0
-        val ws = layout(r.w, contentWidths(rows))
+        val bar = if count > visible && visible > 0 && r.w >= 2 then scrollbar else None
+        val body = bar match
+            Some(_) -> Rect(r.x, r.y, r.w - 1, r.h)
+            None -> r
+        val ws = layout(body.w, contentWidths(rows))
         if header then line(g, r, r.y, columns.map(c -> Span(c.title)), ws, headerStyle, 0)
         for k in 0 ..< visible
             val i = offset + k
             val y = r.y + top + k
-            if i >= count then g.fill(r.x, y, r.w, 1, rowStyle)
-            else if i == selected then line(g, r, y, rows(i), ws, selectedStyle, selectedStyle.attrs)
-            else line(g, r, y, rows(i), ws, rowStyle, 0)
+            if i >= count then g.fill(body.x, y, body.w, 1, rowStyle)
+            else if i == selected then line(g, body, y, rows(i), ws, selectedStyle, selectedStyle.attrs)
+            else line(g, body, y, rows(i), ws, rowStyle, 0)
+        bar match
+            Some(b) -> g.scrollbar(Rect(r.right() - 1, r.y + top, 1, visible), count, offset, visible, b)
+            None -> ()
 
     // Draws one line of cells across `r` at row `y`, the cells with no style in `style` and those
     // with one in it with `attrs` added.
