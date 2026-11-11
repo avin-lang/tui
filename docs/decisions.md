@@ -344,9 +344,9 @@ keys with lines arriving between them and compares every frame and `back`.
 - **Alternatives:** a separate `TailView` class (a second pager with the same keys); a page size in
   lines rather than an overlap (wrong once the pane is resized).
 
-## Proposed: a vertical scrollbar, opt-in on `Table` and `ScrollView`
+## A vertical scrollbar, opt-in on `Table` and `ScrollView`
 
-**Proposed** (branch `scrollbar`), for marshal top's job list. `g.scrollbar(r, total, first, shown,
+**Settled on the user's delegation 2026-11-11** (branch `scrollbar`), for marshal top's job list. `g.scrollbar(r, total, first, shown,
 bar = Scrollbar())` draws a track of `│` with a thumb of `█` over it, in whole cells; `scrollThumb`
 answers the thumb's first cell and size. The thumb is `height * shown / total` rounded, at least 1;
 it is at the top only where `first` is 0 and at the bottom only where the last item is shown, and
