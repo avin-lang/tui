@@ -289,14 +289,14 @@ logFromEnd()
 // pane reading the last `rows + back` lines of the log and showing those that end `back` lines before
 // the last, or the first of them where there are not that many.
 topLogDraw(g: Grid, r: Rect, view: ScrollView, log: Vector[string], back: int)
-    val n = log.length()
+    val n = log.length
     val read = log.slice(largerOf(n - (r.h + back), 0), n)
-    val m = read.length()
+    val m = read.length
     view.draw(g, r, read.slice(0, m - smallerOf(back, largerOf(m - r.h, 0))))
 
 // The last lines of `log` a pane anchored at the end reads: as many as it shows and as many back.
 tail(log: Vector[string], view: ScrollView, height: int) -> Vector[string] =
-    log.slice(largerOf(log.length() - (height + view.back), 0), log.length())
+    log.slice(largerOf(log.length - (height + view.back), 0), log.length)
 
 topScroll(back: int, n: int, limit: int) -> int = if back + n < 0 then 0 else if back + n > limit then limit else back + n
 
@@ -320,7 +320,7 @@ scrollMatchesTopLog()
             var log = numberedLines(start)
             topLogDraw(want, want.area(), follow, log, back)
             port.draw(got, got.area(), tail(log, port, height))
-            for (k, i) in keys.zipWithIndex()
+            for (k, i) in keys.zipWithIndex
                 k match
                     PageUp -> back = topScroll(back, height, limit)
                     PageDown -> back = topScroll(back, -height, limit)

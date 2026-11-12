@@ -76,9 +76,9 @@ impl Grid
             var j = 0
             for i in 0 ..< inner
                 val start = i * 8
-                while j < ends.length() && ends(j) <= start
+                while j < ends.length && ends(j) <= start
                     j += 1
-                if j == ends.length()
+                if j == ends.length
                     cell(left + i, y, restCh, empty, c)
                 else
                     val s = segments(j)

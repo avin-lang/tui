@@ -62,8 +62,8 @@ treeRows(rows: Vector[Row]) -> Vector[Row]
         placed = placed.incl(r.proc.pid)
         out.addOne(Row(r.proc, r.cpu, branch))
         val kids = children.getOrElse(r.proc.pid, Vector[Row]())
-        for (k, i) in kids.zipWithIndex()
-            val last = i == kids.length() - 1
+        for (k, i) in kids.zipWithIndex
+            val last = i == kids.length - 1
             walk(k, lead + (if last then "   " else "│  "), lead + (if last then "└─ " else "├─ "))
     for r in roots.result()
         walk(r, "", "")

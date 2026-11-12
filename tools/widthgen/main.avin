@@ -12,7 +12,7 @@ import avin.process
 data Span(first: int, last: int)
 
 main(args: Vector[string]) -> int
-    if args.length() != 2
+    if args.length != 2
         eprintln("usage: widthgen <unicode data directory> <output file>")
         return 2
     val dir = args(0)
@@ -79,7 +79,7 @@ private spans(text: string, keep: (string) -> bool) -> Vector[Span]
         val line = (if hash >= 0 then raw.slice(0, hash) else raw).trim()
         if line.isEmpty() then continue
         val fields = line.split(";")
-        if fields.length() < 2 || !keep(fields(1).trim()) then continue
+        if fields.length < 2 || !keep(fields(1).trim()) then continue
         val points = fields(0).trim()
         val dots = points.indexOf("..")
         if dots < 0
@@ -87,7 +87,7 @@ private spans(text: string, keep: (string) -> bool) -> Vector[Span]
             found.append(Span(p, p))
         else
             found.append(Span(hex(points.slice(0, dots)), hex(points.slice(dots + 2, points.byteLength()))))
-    found.toVector()
+    found.toVector
 
 private hex(digits: string) -> int
     var n = 0
@@ -104,12 +104,12 @@ private merged(spans: Iterable[Span]) -> Vector[Span]
     sorted.sortInPlaceWith((a, b) -> a.first - b.first)
     val out = Buffer[Span]()
     for s in sorted
-        if out.nonEmpty() && s.first <= out(out.length() - 1).last + 1
-            val top = out(out.length() - 1)
-            if s.last > top.last then out(out.length() - 1) = Span(top.first, s.last)
+        if out.nonEmpty && s.first <= out(out.length - 1).last + 1
+            val top = out(out.length - 1)
+            if s.last > top.last then out(out.length - 1) =Span(top.first, s.last)
         else
             out.append(s)
-    out.toVector()
+    out.toVector
 
 // The code points of `spans` that no span of `holes` holds.
 private minus(spans: Vector[Span], holes: Vector[Span]) -> Vector[Span]
@@ -121,7 +121,7 @@ private minus(spans: Vector[Span], holes: Vector[Span]) -> Vector[Span]
             if h.first > from then out.append(Span(from, h.first - 1))
             from = h.last + 1
         if from <= s.last then out.append(Span(from, s.last))
-    out.toVector()
+    out.toVector
 
 // Writes `spans` as a flat array of first and last code points, eight spans to a line.
 private table(out: StringWriter, name: string, doc: string, spans: Vector[Span])
@@ -132,7 +132,7 @@ private table(out: StringWriter, name: string, doc: string, spans: Vector[Span])
         if i % 8 == 0 then out.write("    ")
         out.write(s"0x${hexText(s.first)}, 0x${hexText(s.last)}")
         i += 1
-        if i < spans.length() then out.write(if i % 8 == 0 then ",\n" else ", ")
+        if i < spans.length then out.write(if i % 8 == 0 then ",\n" else ", ")
     out.write("\n]\n\n")
 
 private hexText(n: int) -> string

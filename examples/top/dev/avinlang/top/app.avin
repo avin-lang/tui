@@ -54,12 +54,12 @@ class App(val sourceNote: string)
         val at = selectedPid match
             Some(pid) -> shown.indexWhere(r -> r.proc.pid == pid)
             None -> -1
-        table.select(if at >= 0 then at else table.selected, shown.length())
+        table.select(if at >= 0 then at else table.selected, shown.length)
         remember()
 
     // The process selected, if any.
     selected() -> Option[Proc] =
-        if 0 <= table.selected < shown.length() then Some(shown(table.selected).proc) else None
+        if 0 <= table.selected < shown.length then Some(shown(table.selected).proc) else None
 
     private remember()
         selectedPid = selected().map(p -> p.pid)
@@ -112,7 +112,7 @@ class App(val sourceNote: string)
             PageUp -> move(-page)
             PageDown -> move(page)
             Home -> moveTo(0)
-            End -> moveTo(shown.length() - 1)
+            End -> moveTo(shown.length - 1)
             _ -> Stay
 
     // Keys while the filter is typed: text goes into it, and the rows narrow as it does.
@@ -155,7 +155,7 @@ class App(val sourceNote: string)
         moveTo(table.selected + n)
 
     private moveTo(i: int) -> Action
-        table.select(i, shown.length())
+        table.select(i, shown.length)
         remember()
         Stay
 
@@ -208,12 +208,12 @@ class App(val sourceNote: string)
         for l in lines
             if textWidth(l) > widest then widest = textWidth(l)
         val w = minInt(widest + 4, g.width)
-        val h = minInt(lines.length() + 2, g.height)
+        val h = minInt(lines.length + 2, g.height)
         val r = Rect((g.width - w) / 2, (g.height - h) / 2, w, h)
         g.fill(r.x, r.y, r.w, r.h, Style.plain())
         g.box(r, Style.fg(Cyan), Rounded, "help — any key closes")
         val inside = r.inset(1)
-        for (l, i) in lines.zipWithIndex()
+        for (l, i) in lines.zipWithIndex
             g.text(inside.x + 1, inside.y + i, l, Style.plain(), inside)
 
 // The keys the bottom line names, each with its word.

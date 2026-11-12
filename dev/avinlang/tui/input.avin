@@ -156,12 +156,12 @@ class Decoder()
     // Takes the first `n` bytes not yet taken.
     private drop(n: int)
         start += n
-        if start >= pending.length()
+        if start >= pending.length
             pending.clear()
             start = 0
 
     // How many bytes are not yet taken.
-    private length() -> int = pending.length() - start
+    private length() -> int = pending.length - start
 
     // The byte `i` places after the first not yet taken.
     private at(i: int) -> int = int(pending(start + i))
@@ -174,8 +174,8 @@ class Decoder()
             drop(1)
             if endsWith(paste, end)
                 var i = 0
-                while i < end.length()
-                    paste.remove(paste.length() - 1)
+                while i < end.length
+                    paste.remove(paste.length - 1)
                     i += 1
                 val text = string.fromUtf8Lossy(paste.toArray())
                 paste.clear()
@@ -296,9 +296,9 @@ class Decoder()
             'Q' -> Some(F(2))
             'R' -> Some(F(3))
             'S' -> Some(F(4))
-            '~' -> tilde(if params.isEmpty() then -1 else params(0))
+            '~' -> tilde(if params.isEmpty then -1 else params(0))
             _ -> None
-        if char(fin) == '~' && params.nonEmpty() && params(0) == 200
+        if char(fin) == '~' && params.nonEmpty && params(0) == 200
             pasting = true
             return Skip(used)
         key match
@@ -309,7 +309,7 @@ class Decoder()
     // An SGR mouse report, `<b;x;y` and `M` for a press or `m` for a release.
     private mouse(text: string, fin: char, used: int) -> Parsed
         val p = numbers(text)
-        if p.length() != 3 || (fin != 'M' && fin != 'm') then return Skip(used)
+        if p.length != 3 || (fin != 'M' && fin != 'm') then return Skip(used)
         val b = p(0)
         val x = p(1) - 1
         val y = p(2) - 1
@@ -356,7 +356,7 @@ tilde(_) = None
 // The modifiers a sequence's second parameter gives, one more than the bits of `Shift`, `Alt` and
 // `Ctrl`; none where there is no second parameter.
 private modifiers(params: Vector[int]) -> int =
-    if params.length() < 2 || params(1) < 1 then 0 else (params(1) - 1) & (Shift | Alt | Ctrl)
+    if params.length < 2 || params(1) < 1 then 0 else (params(1) - 1) & (Shift | Alt | Ctrl)
 
 // The numbers of a parameter string, separated by `;`; an empty one is 0, and a part that is not a
 // number ends them.
@@ -372,8 +372,8 @@ private numbers(text: string) -> Vector[int]
     out.result()
 
 private endsWith(b: Buffer[byte], suffix: Vector[byte]) -> bool
-    val n = b.length()
-    val m = suffix.length()
+    val n = b.length
+    val m = suffix.length
     if n < m then return false
     var i = 0
     while i < m

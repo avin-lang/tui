@@ -27,7 +27,7 @@ run(term: Terminal)
 // Keeps the last ten things that happened, newest first.
 remember(keys: Buffer[string], what: string)
     keys.prepend(what)
-    if keys.length() > 10 then keys.remove(keys.length() - 1)
+    if keys.length > 10 then keys.remove(keys.length - 1)
 
 describe(e: Event) -> string
 describe(KeyPress(k, mods)) = s"key ${tui.keyName(k, mods)}"

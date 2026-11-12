@@ -55,10 +55,10 @@ parseClock(text: string) -> Option[long]
     val dash = text.indexOf('-')
     val days = if dash < 0 then long(0) else text.slice(0, dash).toLongOption()?
     val parts = text.slice(dash + 1, text.byteLength()).split(":")
-    if !(2 <= parts.length() <= 3) then return None
-    val secs = hundredths(parts(parts.length() - 1))?
-    val minutes = parts(parts.length() - 2).toLongOption()?
-    val hours = if parts.length() == 3 then parts(0).toLongOption()? else long(0)
+    if !(2 <= parts.length <= 3) then return None
+    val secs = hundredths(parts(parts.length - 1))?
+    val minutes = parts(parts.length - 2).toLongOption()?
+    val hours = if parts.length == 3 then parts(0).toLongOption()? else long(0)
     if days < 0 || hours < 0 || minutes < 0 then return None
     Some(((days * 24 + hours) * 60 + minutes) * 6000 + secs)
 
@@ -97,7 +97,7 @@ parseSysctl(text: string) -> Option[SystemInfo]
 // `{ 1.52 1.61 1.70 }`.
 parseLoad(text: string) -> Option[Load]
     val words = text.split(" ").filter(w -> w.nonEmpty() && w != "{" && w != "}")
-    if words.length() != 3 then return None
+    if words.length != 3 then return None
     Some(Load(words(0).toRealOption()?, words(1).toRealOption()?, words(2).toRealOption()?))
 
 // `{ sec = 1793409579, usec = 116790 } Fri Oct 30 21:19:39 2026`: the seconds.
@@ -157,7 +157,7 @@ impl VmStat
 // `Mach Virtual Memory Statistics: (page size of 16384 bytes)`, then `Name:   1234.` lines.
 parseVmStat(text: string) -> Option[VmStat]
     val lines = text.lines()
-    if lines.isEmpty() then return None
+    if lines.isEmpty then return None
     val header = lines(0)
     val at = header.indexOf("page size of ")
     if at < 0 then return None

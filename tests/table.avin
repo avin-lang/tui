@@ -87,7 +87,7 @@ tableNarrow()
     Table([Column("a", 0)]).draw(h, Rect(0, 0, 0, 2), [["x"]])
 
 // Rows of one cell each for the second of two columns.
-second(texts: Vector[string]) -> Vector[Vector[Span]] = texts.map(t -> [Span(""), Span(t)]).toVector()
+second(texts: Vector[string]) -> Vector[Vector[Span]] = texts.map(t -> [Span(""), Span(t)]).toVector
 
 @test("a flexible column is held to its max, and what it gives up goes to the others")
 tableMax()
@@ -195,7 +195,7 @@ topLabelWidth(base: Vector[Column], width: int, longest: int) -> int
     var fixed = 0
     for c in base
         fixed += c.width
-    val room = width - fixed - base.length() - 20
+    val room = width - fixed - base.length - 20
     val cap = if room < 24 then room else 24
     val w = if longest < 5 then (if 5 < cap then 5 else cap) else if longest < cap then longest else cap
     if w < 5 then 0 else w

@@ -47,7 +47,7 @@ class Table(val columns: Vector[Column])
 
     // The widths the columns take in `width` columns, with one blank column between two; 0 for a
     // column left out. A fit column is measured against no rows, so it is left out.
-    widths(width: int) -> Vector[int] = layout(width, Vector.fill(columns.length(), 0)).map(w -> maxOf(w, 0))
+    widths(width: int) -> Vector[int] = layout(width, Vector.fill(columns.length, 0)).map(w -> maxOf(w, 0))
 
     // The widths the columns take in `width` columns with `rows` drawn in them, fit columns measured
     // against those rows; 0 for a column left out.
@@ -55,19 +55,19 @@ class Table(val columns: Vector[Column])
 
     // The widest of the heading (where the headings are drawn) and the cells of each fit column in `rows`.
     private contentWidths(rows: Vector[Vector[Span]]) -> Vector[int]
-        val widest = Array.fill(columns.length(), 0)
+        val widest = Array.fill(columns.length, 0)
         if header
-            for j in 0 ..< columns.length()
+            for j in 0 ..< columns.length
                 if columns(j).fit then widest(j) = textWidth(columns(j).title)
         for row in rows
-            for j in 0 ..< minOf(row.length(), columns.length())
+            for j in 0 ..< minOf(row.length, columns.length)
                 if columns(j).fit then widest(j) = maxOf(widest(j), textWidth(row(j).text))
-        widest.toVector()
+        widest.toVector
 
     // The widths, -1 for a column left out: a flexible one for want of room for its `min`, a fit one
     // for want of room or of anything in it. `content` is the widest cell of each column.
     private layout(width: int, content: Vector[int]) -> Vector[int]
-        val n = columns.length()
+        val n = columns.length
         if n == 0 then return Vector[int]()
         val shown = Array.fill(n, true)
         var fixed = 0
@@ -155,7 +155,7 @@ class Table(val columns: Vector[Column])
     private taken(shown: Array[bool], fitted: Array[int], fixed: int) -> int
         var sum = fixed
         var count = 0
-        for j in 0 ..< columns.length()
+        for j in 0 ..< columns.length
             if shown(j)
                 count += 1
                 val c = columns(j)
@@ -174,7 +174,7 @@ class Table(val columns: Vector[Column])
     // selection reverses the cell's own colours.
     drawSpans(g: Grid, r: Rect, rows: Vector[Vector[Span]])
         if r.isEmpty() then return
-        val count = rows.length()
+        val count = rows.length
         select(selected, count)
         val top = if header then 1 else 0
         val visible = maxOf(r.h - top, 0)
@@ -204,9 +204,9 @@ class Table(val columns: Vector[Column])
     private line(g: Grid, r: Rect, y: int, cells: Vector[Span], ws: Vector[int], style: Style, attrs: int)
         g.fill(r.x, y, r.w, 1, style)
         var x = r.x
-        for j in 0 ..< columns.length()
+        for j in 0 ..< columns.length
             if ws(j) < 0 then continue
-            val cell = if j < cells.length() then cells(j) else Span("")
+            val cell = if j < cells.length then cells(j) else Span("")
             val s = cell.style match
                 Some(own) -> own.with(attrs)
                 None -> style

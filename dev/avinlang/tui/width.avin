@@ -33,7 +33,7 @@ private isEmojiBase(c: char) -> bool = int(c) >= 0x80 && inRanges(emojiRanges, i
 // Whether `n` is inside one of the spans of `table`, pairs of first and last code points, sorted.
 private inRanges(table: Array[int], n: int) -> bool
     var lo = 0
-    var hi = table.length() / 2
+    var hi = table.length / 2
     while lo < hi
         val mid = (lo + hi) / 2
         if n < table(2 * mid) then hi = mid
@@ -60,7 +60,7 @@ private isRegionalIndicator(c: char) -> bool = '\u{1f1e6}' <= c <= '\u{1f1ff}'
 clusters(text: string) -> Vector[Cluster]
     val out = Vector.newBuilder[Cluster]()
     val cs = text.chars()
-    val n = cs.length()
+    val n = cs.length
     var i = 0
     while i < n && isZeroWidth(cs(i))
         i += 1

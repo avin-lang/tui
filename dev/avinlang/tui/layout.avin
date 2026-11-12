@@ -15,7 +15,7 @@ data Size
 // The cells each of `sizes` takes out of `total`, with `gap` cells between two parts. A negative
 // size, weight or gap counts as 0, and so does a fraction over a denominator of 0 or less.
 splitSizes(total: int, sizes: Vector[Size], gap: int = 0) -> Vector[int]
-    val n = sizes.length()
+    val n = sizes.length
     if n == 0 then return Vector[int]()
     val gaps = maxOf(gap, 0) * (n - 1)
     var left = maxOf(total - gaps, 0)
@@ -31,7 +31,7 @@ splitSizes(total: int, sizes: Vector[Size], gap: int = 0) -> Vector[int]
         else
             weights += weightOf(s)
         i += 1
-    if weights == 0 then return out.toVector()
+    if weights == 0 then return out.toVector
     val spare = left
     var given = 0
     var seen = 0
@@ -44,7 +44,7 @@ splitSizes(total: int, sizes: Vector[Size], gap: int = 0) -> Vector[int]
             out(i) = upTo - given
             given = upTo
         i += 1
-    out.toVector()
+    out.toVector
 
 // The cells a fixed part or a fraction asks for, or -1 for a fill.
 private wanted(s: Size, whole: int) -> int

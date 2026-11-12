@@ -31,7 +31,7 @@ sortPid()
 
 @test("sorting nothing or one row")
 sortSmall()
-    assertEq(sortRows([], ByCpu).length(), 0)
+    assertEq(sortRows([], ByCpu).length, 0)
     assertEq(pids(sortRows([row(9)], ByMem)), "9")
 
 @test("each sort names its column")
@@ -84,10 +84,10 @@ treeLoops()
 
 @test("the tree of no rows is empty, and a deep chain is indented step by step")
 treeDeep()
-    assertEq(treeRows([]).length(), 0)
+    assertEq(treeRows([]).length, 0)
     val chain = Vector.tabulate(200, i -> row(long(i + 1), ppid = long(i)))
     val t = treeRows(chain)
-    assertEq(t.length(), 200)
+    assertEq(t.length, 200)
     assertEq(t(199).branch, "   ".repeat(198) + "└─ ")
 
 @test("a row's cells")

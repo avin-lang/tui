@@ -25,20 +25,20 @@ class ModalStack()
     var border: Border = Rounded
 
     // Whether no modal is open.
-    isEmpty() -> bool = stack.length() == 0
+    isEmpty() -> bool = stack.length == 0
 
     // How many are open.
-    length() -> int = stack.length()
+    length() -> int = stack.length
 
     // Opens `m` over the others.
     push(m: Modal)
         stack.addOne(m)
 
     // Closes the top one, and answers it.
-    pop() -> Option[Modal] = if isEmpty() then None else Some(stack.remove(stack.length() - 1))
+    pop() -> Option[Modal] = if isEmpty() then None else Some(stack.remove(stack.length - 1))
 
     // The top one, if any.
-    top() -> Option[Modal] = if isEmpty() then None else Some(stack(stack.length() - 1))
+    top() -> Option[Modal] = if isEmpty() then None else Some(stack(stack.length - 1))
 
     // Closes them all.
     clear()
@@ -53,7 +53,7 @@ class ModalStack()
             Resize(_, _) -> return false
             Stop(_) -> return false
             _ -> ()
-        if !stack(stack.length() - 1).handle(e) then pop()
+        if !stack(stack.length - 1).handle(e) then pop()
         true
 
     // The rectangle `m` takes in `area`, border included: its measure centred, held to `area`.
@@ -83,7 +83,7 @@ class MessageBox(val heading: string, val text: string, val style: Style = Style
         for line in text.split("\n")
             widest = maxOf(widest, textWidth(line) + 2)
         val w = minOf(widest, maxWidth)
-        (w, minOf(wrap(text, maxOf(w - 2, 1)).length(), maxHeight))
+        (w, minOf(wrap(text, maxOf(w - 2, 1)).length, maxHeight))
 
     override draw(g: Grid, r: Rect)
         g.textBlock(r.pad(1, 0), text, style)
@@ -101,7 +101,7 @@ class Confirm(val heading: string, val question: string, val answer: (bool) -> u
 
     override measure(maxWidth: int, maxHeight: int) -> (int, int)
         val w = minOf(maxOf(maxOf(textWidth(question), textWidth(Prompt)), textWidth(heading)) + 2, maxWidth)
-        (w, minOf(wrap(question, maxOf(w - 2, 1)).length() + 2, maxHeight))
+        (w, minOf(wrap(question, maxOf(w - 2, 1)).length + 2, maxHeight))
 
     override draw(g: Grid, r: Rect)
         val inside = r.pad(1, 0)

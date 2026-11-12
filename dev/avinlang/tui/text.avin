@@ -30,14 +30,14 @@ private wrapLine(para: string, width: int, out: Builder[string, Vector[string]])
     val word = Buffer[Cluster]()
     for c in clusters(para)
         if c.text == " "
-            if word.length() > 0
+            if word.length > 0
                 rows.place(spaces, word)
                 word.clear()
                 spaces = 0
             spaces += 1
         else
             word.addOne(c)
-    if word.length() > 0 then rows.place(spaces, word)
+    if word.length > 0 then rows.place(spaces, word)
     else if rows.isBlank() then rows.spaces(minOf(spaces, width))
     rows.newRow()
 
@@ -133,15 +133,15 @@ impl Grid
         val lines = overflow match
             Wrap -> wrap(text, r.w)
             WrapChars -> wrapChars(text, r.w)
-            Ellipsis -> text.split("\n").map(l -> fitted(l, r.w)).toVector()
+            Ellipsis -> text.split("\n").map(l -> fitted(l, r.w)).toVector
         val c = r.intersect(clip)
-        val shown = minOf(lines.length(), maxOf(r.h, 0))
+        val shown = minOf(lines.length,maxOf(r.h, 0))
         for k in 0 ..< shown
-            val line = if k == shown - 1 && shown < lines.length() then withEllipsis(lines(k), r.w) else lines(k)
+            val line = if k == shown - 1 && shown < lines.length then withEllipsis(lines(k), r.w) else lines(k)
             val lw = textWidth(line)
             val before = if align < 0 || lw >= r.w then 0 else if align == 0 then (r.w - lw) / 2 else r.w - lw
             self.text(r.x + before, r.y + k, line, style, c)
-        lines.length()
+        lines.length
 
     // Draws a horizontal line of `ch`, `width` columns from column `x` of row `y`.
     hline(x: int, y: int, width: int, style: Style = Style.plain(), ch: char = '─', clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue))
@@ -197,7 +197,7 @@ impl Grid
             widest = maxOf(widest, textWidth(label))
         val valueX = r.x + widest + maxOf(gap, 0)
         val c = r.intersect(clip)
-        val n = minOf(pairs.length(), r.h)
+        val n = minOf(pairs.length, r.h)
         for k in 0 ..< n
             val (label, value) = pairs(k)
             text(r.x, r.y + k, fitted(label, r.w), labelStyle, c)

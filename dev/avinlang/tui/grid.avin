@@ -46,7 +46,7 @@ class Grid(val width: int, val height: int)
     clear(style: Style = Style.plain())
         val blank = blankCell(style)
         var i = 0
-        while i < cells.length()
+        while i < cells.length
             cells(i) = blank
             i += 1
 
@@ -62,7 +62,7 @@ class Grid(val width: int, val height: int)
     copy() -> Grid
         val g = Grid(width, height)
         var i = 0
-        while i < cells.length()
+        while i < cells.length
             g.cells(i) = cells(i)
             i += 1
         g

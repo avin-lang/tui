@@ -205,7 +205,7 @@ class Terminal(val options: Options, val colorMode: ColorMode, private val hook:
             Ok(true) -> ()
             _ -> return false
         val got = reader.read(chunk)
-        if got.length() == 0
+        if got.length == 0
             open = false
             return true
         decoder.feed(got)

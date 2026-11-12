@@ -20,7 +20,7 @@ usage(None, s) = Usage(CpuShare(0.0, 0.0), s.cores.map(_ -> CpuShare(0.0, 0.0)),
 usage(Some(b), s) =
     val gone = HashMap[long, Proc]() ++ b.procs.map(p -> (p.pid, p))
     val wall = s.at - b.at
-    val ticked = s.cores.nonEmpty() && b.cores.length() == s.cores.length()
+    val ticked = s.cores.nonEmpty && b.cores.length == s.cores.length
     val cores = if ticked then b.cores.zip(s.cores).map(between) else s.cores.map(_ -> CpuShare(0.0, 0.0))
     var procs = HashMap[long, real]()
     var userSum: long = 0
