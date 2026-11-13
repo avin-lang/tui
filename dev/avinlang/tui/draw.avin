@@ -5,33 +5,33 @@ module dev.avinlang.tui
 data Rect(x: int, y: int, w: int, h: int)
 
 impl Rect
-    // The column just past its right edge, and the row just below its bottom.
-    right() -> int = x + w
-    bottom() -> int = y + h
+  // The column just past its right edge, and the row just below its bottom.
+  right() -> int = x + w
+  bottom() -> int = y + h
 
-    // Whether it holds no cell.
-    isEmpty() -> bool = w <= 0 || h <= 0
+  // Whether it holds no cell.
+  isEmpty() -> bool = w <= 0 || h <= 0
 
-    // Whether column `cx` of row `cy` is inside it.
-    contains(cx: int, cy: int) -> bool = x <= cx < x + w && y <= cy < y + h
+  // Whether column `cx` of row `cy` is inside it.
+  contains(cx: int, cy: int) -> bool = x <= cx < x + w && y <= cy < y + h
 
-    // The cells both it and `other` hold.
-    intersect(other: Rect) -> Rect
-        val left = maxOf(x, other.x)
-        val top = maxOf(y, other.y)
-        val r = minOf(right(), other.right())
-        val b = minOf(bottom(), other.bottom())
-        Rect(left, top, maxOf(r - left, 0), maxOf(b - top, 0))
+  // The cells both it and `other` hold.
+  intersect(other: Rect) -> Rect
+    val left = maxOf(x, other.x)
+    val top = maxOf(y, other.y)
+    val r = minOf(right(), other.right())
+    val b = minOf(bottom(), other.bottom())
+    Rect(left, top, maxOf(r - left, 0), maxOf(b - top, 0))
 
-    // It with `n` cells taken off every side, as the inside of a border is.
-    inset(n: int) -> Rect = Rect(x + n, y + n, maxOf(w - 2 * n, 0), maxOf(h - 2 * n, 0))
+  // It with `n` cells taken off every side, as the inside of a border is.
+  inset(n: int) -> Rect = Rect(x + n, y + n, maxOf(w - 2 * n, 0), maxOf(h - 2 * n, 0))
 
 // The lines a box is drawn with.
 data Border
-    Single
-    Double
-    Rounded
-    Heavy
+  Single
+  Double
+  Rounded
+  Heavy
 
 // The six characters of a border: the two edges and the four corners, top left first, clockwise.
 private borderChars(b: Border) -> string
@@ -46,89 +46,117 @@ private val eighths: string = " ▏▎▍▌▋▊▉█"
 // Drawing into a grid. Everything drawn is clipped to the grid and to the rectangle given as `clip`,
 // so a widget never draws outside the place it was given.
 impl Grid
-    // The whole grid as a rectangle.
-    area() -> Rect = Rect(0, 0, width, height)
+  // The whole grid as a rectangle.
+  area() -> Rect = Rect(0, 0, width, height)
 
-    // Writes `text` along row `y` from column `x`, cluster by cluster, inside `clip`, and answers the
-    // column after the last cluster, whether or not all of it was inside. A two-column cluster cut by
-    // an edge of `clip` is drawn as the blank half that is inside. Control characters are U+FFFD.
-    text(x: int, y: int, text: string, style: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)) -> int
-        val c = clip.intersect(area())
-        val after = x + textWidth(text)
-        if y < c.y || y >= c.bottom() then return after
-        var col = x
-        for cluster in clusters(text)
-            if col >= c.right() then return after
-            if cluster.width == 2 && col + 1 == c.x
-                if c.x < c.right() then put(col + 1, y, Cluster(" ", 1), style)
-            else if cluster.width == 2 && col >= c.x && col + 1 == c.right()
-                put(col, y, Cluster(" ", 1), style)
-            else if col >= c.x
-                put(col, y, cluster, style)
-            col += cluster.width
-        after
+  // Writes `text` along row `y` from column `x`, cluster by cluster, inside `clip`, and answers the
+  // column after the last cluster, whether or not all of it was inside. A two-column cluster cut by
+  // an edge of `clip` is drawn as the blank half that is inside. Control characters are U+FFFD.
+  text(
+      x: int,
+      y: int,
+      text: string,
+      style: Style = Style.plain(),
+      clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)
+  ) -> int
+    val c = clip.intersect(area())
+    val after = x + textWidth(text)
+    if y < c.y || y >= c.bottom() then return after
+    var col = x
+    for cluster in clusters(text)
+      if col >= c.right() then return after
+      if cluster.width == 2 && col + 1 == c.x
+        if c.x < c.right() then put(col + 1, y, Cluster(" ", 1), style)
+      else if cluster.width == 2 && col >= c.x && col + 1 == c.right()
+        put(col, y, Cluster(" ", 1), style)
+      else if col >= c.x
+        put(col, y, cluster, style)
+      col += cluster.width
+    after
 
-    // Writes `text` inside `width` columns from column `x`: cut at the edge, the last column showing
-    // `…` where text was cut, and padded with blanks in `style` to the full width. `align` places
-    // text shorter than the width: -1 left, 0 centred, 1 right.
-    textIn(x: int, y: int, width: int, text: string, style: Style = Style.plain(), align: int = -1, clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue))
-        if width <= 0 then return
-        val shown = fitted(text, width)
-        val w = textWidth(shown)
-        val before = if align < 0 then 0 else if align == 0 then (width - w) / 2 else width - w
-        val inside = Rect(x, y, width, 1).intersect(clip)
-        fill(inside.x, inside.y, inside.w, inside.h, style)
-        self.text(x + before, y, shown, style, inside)
+  // Writes `text` inside `width` columns from column `x`: cut at the edge, the last column showing
+  // `…` where text was cut, and padded with blanks in `style` to the full width. `align` places
+  // text shorter than the width: -1 left, 0 centred, 1 right.
+  textIn(
+      x: int,
+      y: int,
+      width: int,
+      text: string,
+      style: Style = Style.plain(),
+      align: int = -1,
+      clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)
+  )
+    if width <= 0 then return
+    val shown = fitted(text, width)
+    val w = textWidth(shown)
+    val before = if align < 0 then 0 else if align == 0 then (width - w) / 2 else width - w
+    val inside = Rect(x, y, width, 1).intersect(clip)
+    fill(inside.x, inside.y, inside.w, inside.h, style)
+    self.text(x + before, y, shown, style, inside)
 
-    // Draws a border around `r` in `style`, with `title` set into its top edge after one line of it,
-    // cut to fit. A rectangle less than two cells wide or high gets no border.
-    box(r: Rect, style: Style = Style.plain(), border: Border = Single, title: string = "", clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue))
-        if r.w < 2 || r.h < 2 then return
-        val c = r.intersect(clip)
-        val chars = borderChars(border).chars
-        for col in r.x + 1 ..< r.right() - 1
-            cell(col, r.y, chars(0), style, c)
-            cell(col, r.bottom() - 1, chars(0), style, c)
-        for row in r.y + 1 ..< r.bottom() - 1
-            cell(r.x, row, chars(1), style, c)
-            cell(r.right() - 1, row, chars(1), style, c)
-        cell(r.x, r.y, chars(2), style, c)
-        cell(r.right() - 1, r.y, chars(3), style, c)
-        cell(r.right() - 1, r.bottom() - 1, chars(4), style, c)
-        cell(r.x, r.bottom() - 1, chars(5), style, c)
-        if title.nonEmpty && r.w > 4
-            text(r.x + 2, r.y, fitted(title, r.w - 4), style, Rect(r.x + 2, r.y, r.w - 4, 1).intersect(c))
+  // Draws a border around `r` in `style`, with `title` set into its top edge after one line of it,
+  // cut to fit. A rectangle less than two cells wide or high gets no border.
+  box(
+      r: Rect,
+      style: Style = Style.plain(),
+      border: Border = Single,
+      title: string = "",
+      clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)
+  )
+    if r.w < 2 || r.h < 2 then return
+    val c = r.intersect(clip)
+    val chars = borderChars(border).chars
+    for col in r.x + 1 ..< r.right() - 1
+      cell(col, r.y, chars(0), style, c)
+      cell(col, r.bottom() - 1, chars(0), style, c)
+    for row in r.y + 1 ..< r.bottom() - 1
+      cell(r.x, row, chars(1), style, c)
+      cell(r.right() - 1, row, chars(1), style, c)
+    cell(r.x, r.y, chars(2), style, c)
+    cell(r.right() - 1, r.y, chars(3), style, c)
+    cell(r.right() - 1, r.bottom() - 1, chars(4), style, c)
+    cell(r.x, r.bottom() - 1, chars(5), style, c)
+    if title.nonEmpty && r.w > 4
+      text(r.x + 2, r.y, fitted(title, r.w - 4), style, Rect(r.x + 2, r.y, r.w - 4, 1).intersect(c))
 
-    // Draws a horizontal bar `width` columns long from column `x`, filled to `fraction` (0 to 1, a
-    // value outside held to it) in eighths of a cell: the full cells in `filled`, the part of a cell in
-    // `filled` over `empty`'s background, the rest blank in `empty`.
-    meter(x: int, y: int, width: int, fraction: real, filled: Style, empty: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue))
-        if width <= 0 then return
-        // A NaN is no comparison's answer, so it is held to 0 with the negatives.
-        val f = if fraction.isNaN || fraction <= 0.0 then 0.0 else if fraction > 1.0 then 1.0 else fraction
-        val units = int(f * real(width * 8) + 0.5)
-        val full = units / 8
-        val part = units % 8
-        val c = clip.intersect(area())
-        val partial = Style(filled.fg, empty.bg, filled.attrs)
-        for i in 0 ..< width
-            val ch = if i < full then '█' else if i == full && part > 0 then eighths.chars(part) else ' '
-            val s = if i < full then filled else if i == full && part > 0 then partial else empty
-            cell(x + i, y, ch, s, c)
+  // Draws a horizontal bar `width` columns long from column `x`, filled to `fraction` (0 to 1, a
+  // value outside held to it) in eighths of a cell: the full cells in `filled`, the part of a cell in
+  // `filled` over `empty`'s background, the rest blank in `empty`.
+  meter(
+      x: int,
+      y: int,
+      width: int,
+      fraction: real,
+      filled: Style,
+      empty: Style = Style.plain(),
+      clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)
+  )
+    if width <= 0 then return
+    // A NaN is no comparison's answer, so it is held to 0 with the negatives.
+    val f = if fraction.isNaN || fraction <= 0.0 then 0.0 else if fraction > 1.0 then 1.0 else fraction
+    val units = int(f * real(width * 8) + 0.5)
+    val full = units / 8
+    val part = units % 8
+    val c = clip.intersect(area())
+    val partial = Style(filled.fg, empty.bg, filled.attrs)
+    for i in 0 ..< width
+      val ch = if i < full then '█' else if i == full && part > 0 then eighths.chars(part) else ' '
+      val s = if i < full then filled else if i == full && part > 0 then partial else empty
+      cell(x + i, y, ch, s, c)
 
-    // Puts one character at a column and row inside `clip`.
-    private cell(x: int, y: int, ch: char, style: Style, clip: Rect)
-        if clip.contains(x, y) then putChar(x, y, ch, style)
+  // Puts one character at a column and row inside `clip`.
+  private cell(x: int, y: int, ch: char, style: Style, clip: Rect)
+    if clip.contains(x, y) then putChar(x, y, ch, style)
 
 // `text` cut to at most `width` columns, its last column `…` where any of it was cut.
 fitted(text: string, width: int) -> string
-    if width <= 0 then return ""
-    if textWidth(text) <= width then return text
-    val out = StringWriter()
-    var used = 0
-    for c in clusters(text)
-        if used + c.width > width - 1 then break
-        out.write(c.text)
-        used += c.width
-    out.write("…")
-    out.text
+  if width <= 0 then return ""
+  if textWidth(text) <= width then return text
+  val out = StringWriter()
+  var used = 0
+  for c in clusters(text)
+    if used + c.width > width - 1 then break
+    out.write(c.text)
+    used += c.width
+  out.write("…")
+  out.text

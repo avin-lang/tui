@@ -9,69 +9,71 @@ val psFormat: string = "pid=,ppid=,user=,pcpu=,pmem=,rss=,time=,utime=,state=,co
 
 // The processes `ps -axo <psFormat>` printed, one per line it could read.
 parsePs(text: string) -> Vector[Proc]
-    val out = Vector.newBuilder[Proc]()
-    for line in text.lines
-        parsePsLine(line) match
-            Some(p) -> out.addOne(p)
-            None -> ()
-    out.result()
+  val out = Vector.newBuilder[Proc]()
+  for line in text.lines
+    parsePsLine(line) match
+      Some(p) -> out.addOne(p)
+      None -> ()
+  out.result()
 
 // One line of `ps` output: nine columns separated by blanks, then the command, which keeps its own
 // blanks.
 parsePsLine(line: string) -> Option[Proc]
-    val (f, command) = fields(line, 9)?
-    Some(Proc(
-        f(0).toLongOption()?,
-        f(1).toLongOption()?,
-        f(2),
-        f(3).toRealOption()?,
-        f(4).toRealOption()?,
-        f(5).toLongOption()?,
-        parseClock(f(6))?,
-        parseClock(f(7))?,
-        f(8),
-        command
-    ))
+  val (f, command) = fields(line, 9)?
+  Some(
+    Proc(
+      f(0).toLongOption()?,
+      f(1).toLongOption()?,
+      f(2),
+      f(3).toRealOption()?,
+      f(4).toRealOption()?,
+      f(5).toLongOption()?,
+      parseClock(f(6))?,
+      parseClock(f(7))?,
+      f(8),
+      command
+    )
+  )
 
 // The first `n` blank-separated words of `line`, and what follows them with the blanks around it
 // taken off. `None` when the line has fewer than `n` words.
 fields(line: string, n: int) -> Option[(Vector[string], string)]
-    val words = Vector.newBuilder[string]()
-    var at = 0
-    for _ in 0 ..< n
-        val start = line.indexWhere(c -> !isBlank(c), at)
-        if start < 0 then return None
-        val end = line.indexWhere(isBlank, start)
-        val past = if end < 0 then line.byteLength else end
-        words.addOne(line.slice(start, past))
-        at = past
-    Some((words.result(), line.slice(at, line.byteLength).trim))
+  val words = Vector.newBuilder[string]()
+  var at = 0
+  for _ in 0 ..< n
+    val start = line.indexWhere(c -> !isBlank(c), at)
+    if start < 0 then return None
+    val end = line.indexWhere(isBlank, start)
+    val past = if end < 0 then line.byteLength else end
+    words.addOne(line.slice(start, past))
+    at = past
+  Some((words.result(), line.slice(at, line.byteLength).trim))
 
 private isBlank(c: char) -> bool = c == ' ' || c == '\t'
 
 // A processor time as `ps` writes it, in hundredths of a second: `m:ss.hh` with as many minutes as
 // there are, or `[d-]h:mm:ss[.hh]`.
 parseClock(text: string) -> Option[long]
-    val dash = text.indexOf('-')
-    val days = if dash < 0 then long(0) else text.slice(0, dash).toLongOption()?
-    val parts = text.slice(dash + 1, text.byteLength).split(":")
-    if !(2 <= parts.length <= 3) then return None
-    val secs = hundredths(parts(parts.length - 1))?
-    val minutes = parts(parts.length - 2).toLongOption()?
-    val hours = if parts.length == 3 then parts(0).toLongOption()? else long(0)
-    if days < 0 || hours < 0 || minutes < 0 then return None
-    Some(((days * 24 + hours) * 60 + minutes) * 6000 + secs)
+  val dash = text.indexOf('-')
+  val days = if dash < 0 then long(0) else text.slice(0, dash).toLongOption()?
+  val parts = text.slice(dash + 1, text.byteLength).split(":")
+  if !(2 <= parts.length <= 3) then return None
+  val secs = hundredths(parts(parts.length - 1))?
+  val minutes = parts(parts.length - 2).toLongOption()?
+  val hours = if parts.length == 3 then parts(0).toLongOption()? else long(0)
+  if days < 0 || hours < 0 || minutes < 0 then return None
+  Some(((days * 24 + hours) * 60 + minutes) * 6000 + secs)
 
 // Seconds written `ss` or `ss.h…`, in hundredths, further digits dropped.
 private hundredths(text: string) -> Option[long]
-    val dot = text.indexOf('.')
-    if dot < 0
-        val s = text.toLongOption()?
-        return if s < 0 then None else Some(s * 100)
-    val whole = text.slice(0, dot).toLongOption()?
-    val frac = (text.slice(dot + 1, text.byteLength) + "00").take(2)
-    val f = frac.toLongOption()?
-    if whole < 0 || f < 0 then None else Some(whole * 100 + f)
+  val dot = text.indexOf('.')
+  if dot < 0
+    val s = text.toLongOption()?
+    return if s < 0 then None else Some(s * 100)
+  val whole = text.slice(0, dot).toLongOption()?
+  val frac = (text.slice(dot + 1, text.byteLength) + "00").take(2)
+  val f = frac.toLongOption()?
+  if whole < 0 || f < 0 then None else Some(whole * 100 + f)
 
 // What `sysctl hw.ncpu vm.loadavg kern.boottime hw.memsize vm.swapusage` printed, by name.
 data SystemInfo(cpus: int, load: Load, bootTime: long, memory: long, swap: Swap)
@@ -82,53 +84,55 @@ val sysctlNames: Vector[string] = ["hw.ncpu", "vm.loadavg", "kern.boottime", "hw
 // Reads `name: value` lines; a missing or unreadable value is `None`, naming nothing more, since the
 // header cannot be drawn without all of them. A machine with no swap prints totals of zero.
 parseSysctl(text: string) -> Option[SystemInfo]
-    var values = HashMap[string, string]()
-    for line in text.lines
-        val colon = line.indexOf(": ")
-        if colon > 0 then values = values.updated(line.slice(0, colon).trim, line.slice(colon + 2, line.byteLength).trim)
-    Some(SystemInfo(
-        values.get("hw.ncpu")?.toIntOption()?,
-        parseLoad(values.get("vm.loadavg")?)?,
-        parseBootTime(values.get("kern.boottime")?)?,
-        values.get("hw.memsize")?.toLongOption()?,
-        parseSwap(values.get("vm.swapusage")?)?
-    ))
+  var values = HashMap[string, string]()
+  for line in text.lines
+    val colon = line.indexOf(": ")
+    if colon > 0 then values = values.updated(line.slice(0, colon).trim, line.slice(colon + 2, line.byteLength).trim)
+  Some(
+    SystemInfo(
+      values.get("hw.ncpu")?.toIntOption()?,
+      parseLoad(values.get("vm.loadavg")?)?,
+      parseBootTime(values.get("kern.boottime")?)?,
+      values.get("hw.memsize")?.toLongOption()?,
+      parseSwap(values.get("vm.swapusage")?)?
+    )
+  )
 
 // `{ 1.52 1.61 1.70 }`.
 parseLoad(text: string) -> Option[Load]
-    val words = text.split(" ").filter(w -> w.nonEmpty && w != "{" && w != "}")
-    if words.length != 3 then return None
-    Some(Load(words(0).toRealOption()?, words(1).toRealOption()?, words(2).toRealOption()?))
+  val words = text.split(" ").filter(w -> w.nonEmpty && w != "{" && w != "}")
+  if words.length != 3 then return None
+  Some(Load(words(0).toRealOption()?, words(1).toRealOption()?, words(2).toRealOption()?))
 
 // `{ sec = 1793409579, usec = 116790 } Fri Oct 30 21:19:39 2026`: the seconds.
 parseBootTime(text: string) -> Option[long]
-    val label = "{ sec = "
-    val at = text.indexOf(label)
-    if at < 0 then return None
-    val start = at + label.byteLength
-    val end = text.indexWhere(c -> !('0' <= c <= '9'), start)
-    text.slice(start, if end < 0 then text.byteLength else end).toLongOption()
+  val label = "{ sec = "
+  val at = text.indexOf(label)
+  if at < 0 then return None
+  val start = at + label.byteLength
+  val end = text.indexWhere(c -> !('0' <= c <= '9'), start)
+  text.slice(start, if end < 0 then text.byteLength else end).toLongOption()
 
 // `total = 4096.00M  used = 2390.75M  free = 1705.25M  (encrypted)`.
 parseSwap(text: string) -> Option[Swap]
-    Some(Swap(sizeAfter(text, "total = ")?, sizeAfter(text, "used = ")?))
+  Some(Swap(sizeAfter(text, "total = ")?, sizeAfter(text, "used = ")?))
 
 private sizeAfter(text: string, label: string) -> Option[long]
-    val at = text.indexOf(label)
-    if at < 0 then return None
-    val start = at + label.byteLength
-    val end = text.indexOf(' ', start)
-    parseSize(text.slice(start, if end < 0 then text.byteLength else end))
+  val at = text.indexOf(label)
+  if at < 0 then return None
+  val start = at + label.byteLength
+  val end = text.indexOf(' ', start)
+  parseSize(text.slice(start, if end < 0 then text.byteLength else end))
 
 // A size such as `4096.00M`, `512K`, `1.5G` or `0`, in bytes.
 parseSize(text: string) -> Option[long]
-    if text.isEmpty then return None
-    val unit = text.last
-    val scale = unitScale(unit)
-    if scale == 0 then return None
-    val number = if '0' <= unit <= '9' then text else text.dropRight(1)
-    val n = number.toRealOption()?
-    if !(n >= 0.0) then None else Some(long(n * real(scale) + 0.5))
+  if text.isEmpty then return None
+  val unit = text.last
+  val scale = unitScale(unit)
+  if scale == 0 then return None
+  val number = if '0' <= unit <= '9' then text else text.dropRight(1)
+  val n = number.toRealOption()?
+  if !(n >= 0.0) then None else Some(long(n * real(scale) + 0.5))
 
 private unitScale(c: char) -> long
 unitScale('B') = 1
@@ -143,34 +147,34 @@ unitScale(_) = 0
 data VmStat(pageSize: long, counts: Map[string, long])
 
 impl VmStat
-    // The count named `name` in bytes; 0 for a count it did not print.
-    bytes(name: string) -> long = counts.getOrElse(name, 0) * pageSize
+  // The count named `name` in bytes; 0 for a count it did not print.
+  bytes(name: string) -> long = counts.getOrElse(name, 0) * pageSize
 
-    // Memory as the meter shows it, out of `total` bytes.
-    memory(total: long) -> Memory = Memory(
-        total,
-        bytes("Pages active") + bytes("Pages wired down"),
-        bytes("Pages occupied by compressor"),
-        bytes("Pages inactive")
-    )
+  // Memory as the meter shows it, out of `total` bytes.
+  memory(total: long) -> Memory = Memory(
+    total,
+    bytes("Pages active") + bytes("Pages wired down"),
+    bytes("Pages occupied by compressor"),
+    bytes("Pages inactive")
+  )
 
 // `Mach Virtual Memory Statistics: (page size of 16384 bytes)`, then `Name:   1234.` lines.
 parseVmStat(text: string) -> Option[VmStat]
-    val lines = text.lines
-    if lines.isEmpty then return None
-    val header = lines(0)
-    val at = header.indexOf("page size of ")
-    if at < 0 then return None
-    val start = at + 13
-    val end = header.indexOf(' ', start)
-    val pageSize = header.slice(start, if end < 0 then header.byteLength else end).toLongOption()?
-    if pageSize <= 0 then return None
-    var counts = HashMap[string, long]()
-    for line in lines.drop(1)
-        val colon = line.lastIndexOf(':')
-        if colon > 0
-            val name = line.slice(0, colon).replace("\"", "").trim
-            line.slice(colon + 1, line.byteLength).trim.stripSuffix(".").toLongOption() match
-                Some(n) -> counts = counts.updated(name, n)
-                None -> ()
-    Some(VmStat(pageSize, counts))
+  val lines = text.lines
+  if lines.isEmpty then return None
+  val header = lines(0)
+  val at = header.indexOf("page size of ")
+  if at < 0 then return None
+  val start = at + 13
+  val end = header.indexOf(' ', start)
+  val pageSize = header.slice(start, if end < 0 then header.byteLength else end).toLongOption()?
+  if pageSize <= 0 then return None
+  var counts = HashMap[string, long]()
+  for line in lines.drop(1)
+    val colon = line.lastIndexOf(':')
+    if colon > 0
+      val name = line.slice(0, colon).replace("\"", "").trim
+      line.slice(colon + 1, line.byteLength).trim.stripSuffix(".").toLongOption() match
+        Some(n) -> counts = counts.updated(name, n)
+        None -> ()
+  Some(VmStat(pageSize, counts))

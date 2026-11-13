@@ -8,207 +8,226 @@ minTable() -> Table = Table([Column("a", 0, min = 5), Column("b", 4), Column("c"
 
 @test("flexible columns get their minimums first and share the rest by weight")
 tableMinFlex()
-    assertEq(minTable().widths(20), [7, 4, 7])
-    assertEq(minTable().widths(21), [7, 4, 8])
-    assertEq(Table([Column("a", 0, min = 3, flex = 0), Column("b", 0)]).widths(10), [3, 6])
-    assertEq(Table([Column("a", 0, flex = 0)]).widths(10), [0])
+  assertEq(minTable().widths(20), [7, 4, 7])
+  assertEq(minTable().widths(21), [7, 4, 8])
+  assertEq(Table([Column("a", 0, min = 3, flex = 0), Column("b", 0)]).widths(10), [3, 6])
+  assertEq(Table([Column("a", 0, flex = 0)]).widths(10), [0])
 
 @test("a flexible column with no room for its minimum is left out, the last first")
 tableDropsColumns()
-    assertEq(minTable().widths(10), [5, 4, 0])
-    assertEq(minTable().widths(8), [0, 4, 0])
-    val g = Grid(10, 2)
-    minTable().draw(g, g.area(), [["x", "y", "z"]])
-    assertEq(rows(g), ["a     b   ", "x     y   "])
+  assertEq(minTable().widths(10), [5, 4, 0])
+  assertEq(minTable().widths(8), [0, 4, 0])
+  val g = Grid(10, 2)
+  minTable().draw(g, g.area(), [["x", "y", "z"]])
+  assertEq(rows(g), ["a     b   ", "x     y   "])
 
 @test("cells in their own styles, reversed on the selected row")
 tableStyledCells()
-    val g = Grid(8, 3)
-    val t = Table([Column("n", 3), Column("s", 0)])
-    t.select(1, 2)
-    t.drawSpans(g, g.area(), [
-        [Span("1"), Span("ok", Some(Style.fg(Green)))],
-        [Span("2"), Span("bad", Some(Style.fg(Red)))]
-    ])
-    assertEq(rows(g), ["n   s   ", "1   ok  ", "2   bad "])
-    assertEq(g(0, 1).style, t.rowStyle)
-    assertEq(g(4, 1).style, Style.fg(Green))
-    assertEq(g(7, 1).style, Style.fg(Green))
-    assertEq(g(0, 2).style, t.selectedStyle)
-    assertEq(g(4, 2).style, Style.fg(Red).with(Reverse))
-    assertEq(g(3, 2).style, t.selectedStyle)
+  val g = Grid(8, 3)
+  val t = Table([Column("n", 3), Column("s", 0)])
+  t.select(1, 2)
+  t.drawSpans(
+    g,
+    g.area(),
+    [
+      [Span("1"), Span("ok", Some(Style.fg(Green)))],
+      [Span("2"), Span("bad", Some(Style.fg(Red)))]
+    ]
+  )
+  assertEq(rows(g), ["n   s   ", "1   ok  ", "2   bad "])
+  assertEq(g(0, 1).style, t.rowStyle)
+  assertEq(g(4, 1).style, Style.fg(Green))
+  assertEq(g(7, 1).style, Style.fg(Green))
+  assertEq(g(0, 2).style, t.selectedStyle)
+  assertEq(g(4, 2).style, Style.fg(Red).with(Reverse))
+  assertEq(g(3, 2).style, t.selectedStyle)
 
 @test("a table with no header uses every row for rows")
 tableNoHeader()
-    val g = Grid(10, 2)
-    val t = table()
-    t.header = false
-    t.draw(g, g.area(), numbered(2))
-    assertEq(rows(g), ["row0     0", "row1     1"])
-    t.select(5, 6)
-    t.draw(g, g.area(), numbered(6))
-    assertEq(t.offset, 4)
+  val g = Grid(10, 2)
+  val t = table()
+  t.header = false
+  t.draw(g, g.area(), numbered(2))
+  assertEq(rows(g), ["row0     0", "row1     1"])
+  t.select(5, 6)
+  t.draw(g, g.area(), numbered(6))
+  assertEq(t.offset, 4)
 
 @test("a selection out of range is held to the rows when drawn")
 tableSelectionOutOfRange()
-    val g = Grid(10, 3)
-    val t = table()
-    t.selected = 50
-    t.draw(g, g.area(), numbered(3))
-    assertEq(t.selected, 2)
-    assertEq(t.offset, 1)
-    assertEq(rows(g), ["name     n", "row1     1", "row2     2"])
-    assertEq(g(0, 2).style, t.selectedStyle)
-    t.selected = -5
-    t.draw(g, g.area(), numbered(3))
-    assertEq(t.selected, 0)
-    assertEq(t.offset, 0)
+  val g = Grid(10, 3)
+  val t = table()
+  t.selected = 50
+  t.draw(g, g.area(), numbered(3))
+  assertEq(t.selected, 2)
+  assertEq(t.offset, 1)
+  assertEq(rows(g), ["name     n", "row1     1", "row2     2"])
+  assertEq(g(0, 2).style, t.selectedStyle)
+  t.selected = -5
+  t.draw(g, g.area(), numbered(3))
+  assertEq(t.selected, 0)
+  assertEq(t.offset, 0)
 
 @test("wide text is cut whole characters at a time before the ellipsis, either alignment")
 tableWideElision()
-    val g = Grid(4, 2)
-    Table([Column("n", 0)]).draw(g, g.area(), [["日本語x"]])
-    assertEq(g.rowText(1), "日… ")
-    val h = Grid(4, 2)
-    Table([Column("n", 0, 1)]).draw(h, h.area(), [["日本語x"]])
-    assertEq(h.rowText(1), " 日…")
-    val e = Grid(4, 2)
-    Table([Column("n", 0)]).draw(e, e.area(), [["e\u{301}e\u{301}"]])
-    assertEq(e(0, 1).text, "e\u{301}")
+  val g = Grid(4, 2)
+  Table([Column("n", 0)]).draw(g, g.area(), [["日本語x"]])
+  assertEq(g.rowText(1), "日… ")
+  val h = Grid(4, 2)
+  Table([Column("n", 0, 1)]).draw(h, h.area(), [["日本語x"]])
+  assertEq(h.rowText(1), " 日…")
+  val e = Grid(4, 2)
+  Table([Column("n", 0)]).draw(e, e.area(), [["e\u{301}e\u{301}"]])
+  assertEq(e(0, 1).text, "e\u{301}")
 
 @test("a table one column wide or with no columns draws without trapping")
 tableNarrow()
-    val g = Grid(1, 2)
-    table().draw(g, g.area(), numbered(3))
-    assertEq(rows(g), [" ", " "])
-    val h = Grid(4, 2)
-    Table([]).draw(h, h.area(), [["x"]])
-    assertEq(rows(h), ["    ", "    "])
-    Table([Column("a", 0)]).draw(h, Rect(0, 0, 0, 2), [["x"]])
+  val g = Grid(1, 2)
+  table().draw(g, g.area(), numbered(3))
+  assertEq(rows(g), [" ", " "])
+  val h = Grid(4, 2)
+  Table([]).draw(h, h.area(), [["x"]])
+  assertEq(rows(h), ["    ", "    "])
+  Table([Column("a", 0)]).draw(h, Rect(0, 0, 0, 2), [["x"]])
 
 // Rows of one cell each for the second of two columns.
 second(texts: Vector[string]) -> Vector[Vector[Span]] = texts.map(t -> [Span(""), Span(t)]).toVector
 
 @test("a flexible column is held to its max, and what it gives up goes to the others")
 tableMax()
-    assertEq(Table([Column("a", 0, max = 3), Column("b", 0)]).widths(20), [3, 16])
-    assertEq(Table([Column("a", 0, max = 2), Column("b", 0, flex = 2), Column("c", 0)]).widths(22), [2, 12, 6])
-    assertEq(Table([Column("a", 0, max = 3), Column("b", 0, max = 4)]).widths(20), [3, 4])
-    assertEq(Table([Column("a", 0, min = 5, max = 2), Column("b", 0)]).widths(20), [5, 14])
-    assertEq(Table([Column("a", 0, max = 30), Column("b", 0)]).widths(21), [10, 10])
-    assertEq(Table([Column("a", 0, max = 10), Column("b", 0)]).widths(21), [10, 10])
-    assertEq(Table([Column("a", 0, max = 1)]).widths(0), [0])
-    assertEq(Table([Column("a", 4, max = 2), Column("b", 0, max = 3)]).widths(20), [4, 3])
-    // a column too narrow for its min is still left out, max or not
-    assertEq(Table([Column("a", 6), Column("b", 0, min = 5, max = 8)]).widths(10), [6, 0])
-    val g = Grid(10, 2)
-    Table([Column("a", 0, max = 3), Column("b", 0, max = 2)]).draw(g, g.area(), [["xxxxx", "yyy"]])
-    assertEq(rows(g), ["a   b     ", "xx… y…    "])
+  assertEq(Table([Column("a", 0, max = 3), Column("b", 0)]).widths(20), [3, 16])
+  assertEq(Table([Column("a", 0, max = 2), Column("b", 0, flex = 2), Column("c", 0)]).widths(22), [2, 12, 6])
+  assertEq(Table([Column("a", 0, max = 3), Column("b", 0, max = 4)]).widths(20), [3, 4])
+  assertEq(Table([Column("a", 0, min = 5, max = 2), Column("b", 0)]).widths(20), [5, 14])
+  assertEq(Table([Column("a", 0, max = 30), Column("b", 0)]).widths(21), [10, 10])
+  assertEq(Table([Column("a", 0, max = 10), Column("b", 0)]).widths(21), [10, 10])
+  assertEq(Table([Column("a", 0, max = 1)]).widths(0), [0])
+  assertEq(Table([Column("a", 4, max = 2), Column("b", 0, max = 3)]).widths(20), [4, 3])
+  // a column too narrow for its min is still left out, max or not
+  assertEq(Table([Column("a", 6), Column("b", 0, min = 5, max = 8)]).widths(10), [6, 0])
+  val g = Grid(10, 2)
+  Table([Column("a", 0, max = 3), Column("b", 0, max = 2)]).draw(g, g.area(), [["xxxxx", "yyy"]])
+  assertEq(rows(g), ["a   b     ", "xx… y…    "])
 
 @test("a fit column is as wide as its widest cell, between its min and max")
 tableFit()
-    val fit = (min: int, max: int) -> Table([Column("n", 2), Column("L", 0, min = min, max = max, fit = true), Column("c", 0)])
-    assertEq(fit(0, 0).widths(30, second(["ab", "abcd", ""])), [2, 4, 22])
-    assertEq(fit(0, 3).widths(30, second(["ab", "abcd"])), [2, 3, 23])
-    assertEq(fit(6, 0).widths(30, second(["ab", "abcd"])), [2, 6, 20])
-    assertEq(fit(6, 3).widths(30, second(["ab"])), [2, 6, 20])
-    assertEq(fit(0, 0).widths(30, second(["日本"])), [2, 4, 22])
-    assertEq(fit(0, 0).widths(30, second(["abcdefgh"])), [2, 8, 18])
-    // nothing in its cells, no rows, or rows too short to reach it: it keeps its heading's width
-    assertEq(fit(0, 0).widths(30, second(["", ""])), [2, 1, 25])
-    assertEq(fit(5, 0).widths(30, []), [2, 5, 21])
-    assertEq(fit(0, 0).widths(30, [[Span("1")]]), [2, 1, 25])
-    // measured against no rows at all, it is left out
-    assertEq(fit(0, 0).widths(30), [2, 0, 27])
-    // its width and flex are not used
-    assertEq(Table([Column("L", 9, flex = 5, fit = true), Column("c", 0)]).widths(20, [[Span("abc")]]), [3, 16])
+  val fit = (min: int, max: int) -> Table(
+    [Column("n", 2), Column("L", 0, min = min, max = max, fit = true), Column("c", 0)]
+  )
+  assertEq(fit(0, 0).widths(30, second(["ab", "abcd", ""])), [2, 4, 22])
+  assertEq(fit(0, 3).widths(30, second(["ab", "abcd"])), [2, 3, 23])
+  assertEq(fit(6, 0).widths(30, second(["ab", "abcd"])), [2, 6, 20])
+  assertEq(fit(6, 3).widths(30, second(["ab"])), [2, 6, 20])
+  assertEq(fit(0, 0).widths(30, second(["日本"])), [2, 4, 22])
+  assertEq(fit(0, 0).widths(30, second(["abcdefgh"])), [2, 8, 18])
+  // nothing in its cells, no rows, or rows too short to reach it: it keeps its heading's width
+  assertEq(fit(0, 0).widths(30, second(["", ""])), [2, 1, 25])
+  assertEq(fit(5, 0).widths(30, []), [2, 5, 21])
+  assertEq(fit(0, 0).widths(30, [[Span("1")]]), [2, 1, 25])
+  // measured against no rows at all, it is left out
+  assertEq(fit(0, 0).widths(30), [2, 0, 27])
+  // its width and flex are not used
+  assertEq(Table([Column("L", 9, flex = 5, fit = true), Column("c", 0)]).widths(20, [[Span("abc")]]), [3, 16])
 
 @test("a fit column is as wide as the widest of its heading and its cells")
 tableFitHeading()
-    val t = Table([Column("n", 2), Column("LABEL", 0, fit = true), Column("c", 0)])
-    val g = Grid(20, 2)
-    t.drawSpans(g, g.area(), [[Span("1"), Span(""), Span("z")]])
-    assertEq(rows(g), ["n  LABEL c          ", "1        z          "])
-    assertEq(t.widths(20, [[Span("1"), Span(""), Span("z")]]), [2, 5, 11])
-    // one empty cell among full ones, and a heading wider than every cell
-    assertEq(t.widths(30, second(["ab", "", "abcdefg"])), [2, 7, 19])
-    assertEq(t.widths(30, second(["ab", ""])), [2, 5, 21])
-    // wide characters in the heading count two columns each
-    val wide = Table([Column("n", 2), Column("日本語", 0, fit = true), Column("c", 0)])
-    assertEq(wide.widths(30, second(["a", ""])), [2, 6, 20])
-    // max holds the heading too, and empty cells make no difference
-    val capped = Table([Column("n", 2), Column("LABEL", 0, max = 3, fit = true), Column("c", 0)])
-    assertEq(capped.widths(30, second(["", ""])), [2, 3, 23])
-    assertEq(capped.widths(30, second(["abcdefg"])), [2, 3, 23])
-    // no heading and no content: left out
-    assertEq(Table([Column("n", 2), Column("", 0, fit = true), Column("c", 0)]).widths(30, second(["", ""])), [2, 0, 27])
-    // with the headings off, the heading does not count
-    val bare = Table([Column("n", 2), Column("LABEL", 0, fit = true), Column("c", 0)])
-    bare.header = false
-    assertEq(bare.widths(30, second(["", ""])), [2, 0, 27])
-    // on a narrow screen it is narrowed, then left out, as any fit column is
-    val keeps = Table([Column("n", 2), Column("LABEL", 0, fit = true), Column("c", 0, keep = 4)])
-    assertEq(keeps.widths(10, second(["", ""])), [2, 2, 4])
-    assertEq(keeps.widths(7, second(["", ""])), [2, 0, 4])
+  val t = Table([Column("n", 2), Column("LABEL", 0, fit = true), Column("c", 0)])
+  val g = Grid(20, 2)
+  t.drawSpans(g, g.area(), [[Span("1"), Span(""), Span("z")]])
+  assertEq(rows(g), ["n  LABEL c          ", "1        z          "])
+  assertEq(t.widths(20, [[Span("1"), Span(""), Span("z")]]), [2, 5, 11])
+  // one empty cell among full ones, and a heading wider than every cell
+  assertEq(t.widths(30, second(["ab", "", "abcdefg"])), [2, 7, 19])
+  assertEq(t.widths(30, second(["ab", ""])), [2, 5, 21])
+  // wide characters in the heading count two columns each
+  val wide = Table([Column("n", 2), Column("日本語", 0, fit = true), Column("c", 0)])
+  assertEq(wide.widths(30, second(["a", ""])), [2, 6, 20])
+  // max holds the heading too, and empty cells make no difference
+  val capped = Table([Column("n", 2), Column("LABEL", 0, max = 3, fit = true), Column("c", 0)])
+  assertEq(capped.widths(30, second(["", ""])), [2, 3, 23])
+  assertEq(capped.widths(30, second(["abcdefg"])), [2, 3, 23])
+  // no heading and no content: left out
+  assertEq(Table([Column("n", 2), Column("", 0, fit = true), Column("c", 0)]).widths(30, second(["", ""])), [2, 0, 27])
+  // with the headings off, the heading does not count
+  val bare = Table([Column("n", 2), Column("LABEL", 0, fit = true), Column("c", 0)])
+  bare.header = false
+  assertEq(bare.widths(30, second(["", ""])), [2, 0, 27])
+  // on a narrow screen it is narrowed, then left out, as any fit column is
+  val keeps = Table([Column("n", 2), Column("LABEL", 0, fit = true), Column("c", 0, keep = 4)])
+  assertEq(keeps.widths(10, second(["", ""])), [2, 2, 4])
+  assertEq(keeps.widths(7, second(["", ""])), [2, 0, 4])
 
 @test("a fit column gives way to the flexible ones, narrowed to its min and then left out")
 tableFitGivesWay()
-    val t = Table([Column("a", 5), Column("L", 0, min = 2, fit = true), Column("c", 0, keep = 4)])
-    val rs = second(["abcdef"])
-    assertEq(t.widths(20, rs), [5, 6, 7])
-    assertEq(t.widths(17, rs), [5, 6, 4])
-    assertEq(t.widths(15, rs), [5, 4, 4])
-    assertEq(t.widths(13, rs), [5, 2, 4])
-    assertEq(t.widths(12, rs), [5, 0, 6])
-    assertEq(t.widths(3, rs), [5, 0, 0])
-    // a flexible column keeps its min where that is more than keep
-    val m = Table([Column("L", 0, fit = true), Column("c", 0, min = 6, keep = 2)])
-    assertEq(m.widths(10, [[Span("abcdef")]]), [3, 6])
-    // the last fit column gives way first
-    val two = Table([Column("A", 0, min = 1, fit = true), Column("B", 0, min = 1, fit = true), Column("c", 0, keep = 3)])
-    val both = [[Span("aaaa"), Span("bbbb")]]
-    assertEq(two.widths(13, both), [4, 4, 3])
-    assertEq(two.widths(11, both), [4, 2, 3])
-    assertEq(two.widths(9, both), [4, 0, 4])
-    assertEq(two.widths(6, both), [2, 0, 3])
-    assertEq(two.widths(5, both), [1, 0, 3])
-    assertEq(two.widths(4, both), [0, 0, 4])
-    // with no flexible column, it gives way to the fixed ones
-    assertEq(Table([Column("a", 4), Column("L", 0, min = 2, fit = true)]).widths(8, [[Span(""), Span("abcdef")]]), [4, 3])
+  val t = Table([Column("a", 5), Column("L", 0, min = 2, fit = true), Column("c", 0, keep = 4)])
+  val rs = second(["abcdef"])
+  assertEq(t.widths(20, rs), [5, 6, 7])
+  assertEq(t.widths(17, rs), [5, 6, 4])
+  assertEq(t.widths(15, rs), [5, 4, 4])
+  assertEq(t.widths(13, rs), [5, 2, 4])
+  assertEq(t.widths(12, rs), [5, 0, 6])
+  assertEq(t.widths(3, rs), [5, 0, 0])
+  // a flexible column keeps its min where that is more than keep
+  val m = Table([Column("L", 0, fit = true), Column("c", 0, min = 6, keep = 2)])
+  assertEq(m.widths(10, [[Span("abcdef")]]), [3, 6])
+  // the last fit column gives way first
+  val two = Table([Column("A", 0, min = 1, fit = true), Column("B", 0, min = 1, fit = true), Column("c", 0, keep = 3)])
+  val both = [[Span("aaaa"), Span("bbbb")]]
+  assertEq(two.widths(13, both), [4, 4, 3])
+  assertEq(two.widths(11, both), [4, 2, 3])
+  assertEq(two.widths(9, both), [4, 0, 4])
+  assertEq(two.widths(6, both), [2, 0, 3])
+  assertEq(two.widths(5, both), [1, 0, 3])
+  assertEq(two.widths(4, both), [0, 0, 4])
+  // with no flexible column, it gives way to the fixed ones
+  assertEq(Table([Column("a", 4), Column("L", 0, min = 2, fit = true)]).widths(8, [[Span(""), Span("abcdef")]]), [4, 3])
 
 @test("a fit column is drawn at its width, cut with an ellipsis where it gives way")
 tableFitDraws()
-    val t = Table([Column("ID", 2, 1), Column("LABEL", 0, min = 5, max = 8, fit = true), Column("CMD", 0, keep = 3)])
-    val rs = [[Span("1"), Span("build"), Span("make")], [Span("2"), Span("a-very-long-label"), Span("ls")]]
-    val g = Grid(20, 3)
-    t.drawSpans(g, g.area(), rs)
-    assertEq(rows(g), ["ID LABEL    CMD     ", " 1 build    make    ", " 2 a-very-… ls      "])
-    val h = Grid(14, 3)
-    t.drawSpans(h, h.area(), rs)
-    assertEq(rows(h), ["ID LABEL   CMD", " 1 build   ma…", " 2 a-very… ls "])
-    val k = Grid(11, 3)
-    t.drawSpans(k, k.area(), rs)
-    assertEq(rows(k), ["ID CMD     ", " 1 make    ", " 2 ls      "])
+  val t = Table([Column("ID", 2, 1), Column("LABEL", 0, min = 5, max = 8, fit = true), Column("CMD", 0, keep = 3)])
+  val rs = [[Span("1"), Span("build"), Span("make")], [Span("2"), Span("a-very-long-label"), Span("ls")]]
+  val g = Grid(20, 3)
+  t.drawSpans(g, g.area(), rs)
+  assertEq(rows(g), ["ID LABEL    CMD     ", " 1 build    make    ", " 2 a-very-… ls      "])
+  val h = Grid(14, 3)
+  t.drawSpans(h, h.area(), rs)
+  assertEq(rows(h), ["ID LABEL   CMD", " 1 build   ma…", " 2 a-very… ls "])
+  val k = Grid(11, 3)
+  t.drawSpans(k, k.area(), rs)
+  assertEq(rows(k), ["ID CMD     ", " 1 make    ", " 2 ls      "])
 
 // The LABEL column's width as marshal top works it out by hand.
 topLabelWidth(base: Vector[Column], width: int, longest: int) -> int
-    var fixed = 0
-    for c in base
-        fixed += c.width
-    val room = width - fixed - base.length - 20
-    val cap = if room < 24 then room else 24
-    val w = if longest < 5 then (if 5 < cap then 5 else cap) else if longest < cap then longest else cap
-    if w < 5 then 0 else w
+  var fixed = 0
+  for c in base
+    fixed += c.width
+  val room = width - fixed - base.length - 20
+  val cap = if room < 24 then room else 24
+  val w = if longest < 5 then (if 5 < cap then 5 else cap) else if longest < cap then longest else cap
+  if w < 5 then 0 else w
 
 @test("a fit LABEL before a flexible COMMAND that keeps 20 sizes as marshal top's hand-made column does")
 tableFitMatchesTop()
-    val fixed = [Column("ID", 5, 1), Column("STATE", 14), Column("KIND", 8), Column("UNITS", 5, 1), Column("RESV", 6, 1), Column("RSS", 5, 1), Column("PEAK", 5, 1), Column("STARTED", 11), Column("ELAPSED", 8, 1), Column("DEADLINE", 8, 1)]
-    val base = fixed ++ [Column("COMMAND", 0)]
-    val port = Table(fixed ++ [Column("LABEL", 0, min = 5, max = 24, fit = true), Column("COMMAND", 0, keep = 20)])
-    for width in 0 ..< 150
-        for longest in 0 ..< 32
-            val label = Vector.fill(longest, "x").mkString("")
-            val row: Vector[Span] = Vector.fill(10, Span("")) ++ [Span(label), Span("cmd")]
-            val lw = topLabelWidth(base, width, longest)
-            val want = if lw > 0 then Table(fixed ++ [Column("LABEL", lw), Column("COMMAND", 0)]).widths(width) else Table(fixed ++ [Column("LABEL", 0, min = int.MaxValue), Column("COMMAND", 0)]).widths(width)
-            assertEq(port.widths(width, [row]), want)
+  val fixed = [
+    Column("ID", 5, 1),
+    Column("STATE", 14),
+    Column("KIND", 8),
+    Column("UNITS", 5, 1),
+    Column("RESV", 6, 1),
+    Column("RSS", 5, 1),
+    Column("PEAK", 5, 1),
+    Column("STARTED", 11),
+    Column("ELAPSED", 8, 1),
+    Column("DEADLINE", 8, 1)
+  ]
+  val base = fixed ++ [Column("COMMAND", 0)]
+  val port = Table(fixed ++ [Column("LABEL", 0, min = 5, max = 24, fit = true), Column("COMMAND", 0, keep = 20)])
+  for width in 0 ..< 150
+    for longest in 0 ..< 32
+      val label = Vector.fill(longest, "x").mkString("")
+      val row: Vector[Span] = Vector.fill(10, Span("")) ++ [Span(label), Span("cmd")]
+      val lw = topLabelWidth(base, width, longest)
+      val want = if lw > 0 then Table(fixed ++ [Column("LABEL", lw), Column("COMMAND", 0)]).widths(width) else Table(
+        fixed ++ [Column("LABEL", 0, min = int.MaxValue), Column("COMMAND", 0)]
+      ).widths(width)
+      assertEq(port.widths(width, [row]), want)

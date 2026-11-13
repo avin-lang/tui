@@ -3,62 +3,75 @@ module tests
 // What the terminal side decides without a terminal: the colour mode from the environment, key names,
 // and styles.
 import dev.avinlang.tui as tui
-import dev.avinlang.tui.{Alt, Basic16, Bold, Ctrl, Dim, Palette256, Shift, Style, TrueColor, Underline,
-                         detectColorMode, keyName}
+
+import dev.avinlang.tui.{
+  Alt,
+  Basic16,
+  Bold,
+  Ctrl,
+  Dim,
+  Palette256,
+  Shift,
+  Style,
+  TrueColor,
+  Underline,
+  detectColorMode,
+  keyName
+}
 
 @test("COLORTERM of truecolor or 24bit, in any case, is any colour")
 trueColorDetected()
-    assertEq(detectColorMode(Some("truecolor"), Some("xterm")), TrueColor)
-    assertEq(detectColorMode(Some("24bit"), None), TrueColor)
-    assertEq(detectColorMode(Some("TrueColor"), Some("xterm-256color")), TrueColor)
+  assertEq(detectColorMode(Some("truecolor"), Some("xterm")), TrueColor)
+  assertEq(detectColorMode(Some("24bit"), None), TrueColor)
+  assertEq(detectColorMode(Some("TrueColor"), Some("xterm-256color")), TrueColor)
 
 @test("a TERM naming 256color is the palette, and anything else the sixteen")
 paletteDetected()
-    assertEq(detectColorMode(None, Some("xterm-256color")), Palette256)
-    assertEq(detectColorMode(Some("yes"), Some("screen-256color")), Palette256)
-    assertEq(detectColorMode(None, Some("xterm")), Basic16)
-    assertEq(detectColorMode(None, Some("dumb")), Basic16)
-    assertEq(detectColorMode(None, None), Basic16)
-    assertEq(detectColorMode(Some(""), Some("")), Basic16)
+  assertEq(detectColorMode(None, Some("xterm-256color")), Palette256)
+  assertEq(detectColorMode(Some("yes"), Some("screen-256color")), Palette256)
+  assertEq(detectColorMode(None, Some("xterm")), Basic16)
+  assertEq(detectColorMode(None, Some("dumb")), Basic16)
+  assertEq(detectColorMode(None, None), Basic16)
+  assertEq(detectColorMode(Some(""), Some("")), Basic16)
 
 @test("the mouse is reported only when asked for; bracketed paste is on by default")
 optionsDefaults()
-    assertEq(tui.Options().mouse, false)
-    assertEq(tui.Options().paste, true)
-    assertEq(tui.Options(mouse = true).mouse, true)
+  assertEq(tui.Options().mouse, false)
+  assertEq(tui.Options().paste, true)
+  assertEq(tui.Options(mouse = true).mouse, true)
 
 @test("keys are named with their modifiers first")
 keyNames()
-    assertEq(keyName(tui.Char('a'), 0), "a")
-    assertEq(keyName(tui.Char('a'), Ctrl), "Ctrl-a")
-    assertEq(keyName(tui.Char('x'), Ctrl | Alt), "Ctrl-Alt-x")
-    assertEq(keyName(tui.Up, Shift), "Shift-Up")
-    assertEq(keyName(tui.F(5), 0), "F5")
-    assertEq(keyName(tui.Char(' '), 0), "Space")
-    assertEq(keyName(tui.PageDown, Ctrl | Alt | Shift), "Ctrl-Alt-Shift-PageDown")
-    assertEq(keyName(tui.Char('日'), Alt), "Alt-日")
+  assertEq(keyName(tui.Char('a'), 0), "a")
+  assertEq(keyName(tui.Char('a'), Ctrl), "Ctrl-a")
+  assertEq(keyName(tui.Char('x'), Ctrl | Alt), "Ctrl-Alt-x")
+  assertEq(keyName(tui.Up, Shift), "Shift-Up")
+  assertEq(keyName(tui.F(5), 0), "F5")
+  assertEq(keyName(tui.Char(' '), 0), "Space")
+  assertEq(keyName(tui.PageDown, Ctrl | Alt | Shift), "Ctrl-Alt-Shift-PageDown")
+  assertEq(keyName(tui.Char('日'), Alt), "Alt-日")
 
 @test("styles take and lose attributes, and keep only the attribute bits there are")
 styles()
-    val s = Style.plain().with(Bold | Underline)
-    assertEq(s.has(Bold), true)
-    assertEq(s.has(Bold | Underline), true)
-    assertEq(s.has(Dim), false)
-    assertEq(s.without(Bold).attrs, Underline)
-    assertEq(Style.plain().with(1024).attrs, 0)
-    assertEq(Style.fg(tui.Red), Style(tui.Red, tui.Default, 0))
-    assertEq(Style.plain().withBg(tui.Blue).withFg(tui.Green), Style(tui.Green, tui.Blue, 0))
+  val s = Style.plain().with(Bold | Underline)
+  assertEq(s.has(Bold), true)
+  assertEq(s.has(Bold | Underline), true)
+  assertEq(s.has(Dim), false)
+  assertEq(s.without(Bold).attrs, Underline)
+  assertEq(Style.plain().with(1024).attrs, 0)
+  assertEq(Style.fg(tui.Red), Style(tui.Red, tui.Default, 0))
+  assertEq(Style.plain().withBg(tui.Blue).withFg(tui.Green), Style(tui.Green, tui.Blue, 0))
 
 @test("reducing a colour leaves what the mode shows and brings the rest to the nearest")
 reduce()
-    assertEq(tui.reduce(tui.Default, Basic16), tui.Default)
-    assertEq(tui.reduce(tui.Basic(12), Basic16), tui.Basic(12))
-    assertEq(tui.reduce(tui.Rgb(1, 2, 3), TrueColor), tui.Rgb(1, 2, 3))
-    assertEq(tui.reduce(tui.Indexed(100), TrueColor), tui.Indexed(100))
-    assertEq(tui.reduce(tui.Indexed(100), Palette256), tui.Indexed(100))
-    assertEq(tui.reduce(tui.Rgb(0, 255, 0), Palette256), tui.Indexed(46))
-    assertEq(tui.reduce(tui.Indexed(4), Basic16), tui.Basic(4))
-    assertEq(tui.reduce(tui.Indexed(15), Basic16), tui.Basic(15))
-    assertEq(tui.reduce(tui.Indexed(21), Basic16), tui.Basic(4))
-    assertEq(tui.reduce(tui.Indexed(244), Basic16), tui.Basic(8))
-    assertEq(tui.reduce(tui.Rgb(0, 0, 0), Basic16), tui.Basic(0))
+  assertEq(tui.reduce(tui.Default, Basic16), tui.Default)
+  assertEq(tui.reduce(tui.Basic(12), Basic16), tui.Basic(12))
+  assertEq(tui.reduce(tui.Rgb(1, 2, 3), TrueColor), tui.Rgb(1, 2, 3))
+  assertEq(tui.reduce(tui.Indexed(100), TrueColor), tui.Indexed(100))
+  assertEq(tui.reduce(tui.Indexed(100), Palette256), tui.Indexed(100))
+  assertEq(tui.reduce(tui.Rgb(0, 255, 0), Palette256), tui.Indexed(46))
+  assertEq(tui.reduce(tui.Indexed(4), Basic16), tui.Basic(4))
+  assertEq(tui.reduce(tui.Indexed(15), Basic16), tui.Basic(15))
+  assertEq(tui.reduce(tui.Indexed(21), Basic16), tui.Basic(4))
+  assertEq(tui.reduce(tui.Indexed(244), Basic16), tui.Basic(8))
+  assertEq(tui.reduce(tui.Rgb(0, 0, 0), Basic16), tui.Basic(0))

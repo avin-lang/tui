@@ -5,10 +5,10 @@ module dev.avinlang.tui
 // bright forms; `Indexed(n)` is one of the 256 of the extended palette; `Rgb` is a colour of its own,
 // each channel 0 to 255. A terminal that cannot show a colour is sent the nearest it can.
 data Color
-    Default
-    Basic(n: int)
-    Indexed(n: int)
-    Rgb(r: int, g: int, b: int)
+  Default
+  Basic(n: int)
+  Indexed(n: int)
+  Rgb(r: int, g: int, b: int)
 
 // The sixteen basic colours by name.
 val Black: Color = Basic(0)
@@ -42,24 +42,24 @@ val AllAttributes: int = 31
 data Style(fg: Color, bg: Color, attrs: int)
 
 object Style
-    // The terminal's own colours and no attributes.
-    plain() -> Style = Style(Default, Default, 0)
+  // The terminal's own colours and no attributes.
+  plain() -> Style = Style(Default, Default, 0)
 
-    // The colour `fg` on the terminal's own background.
-    fg(c: Color) -> Style = Style(c, Default, 0)
+  // The colour `fg` on the terminal's own background.
+  fg(c: Color) -> Style = Style(c, Default, 0)
 
 impl Style
-    // This style with the foreground `c`.
-    withFg(c: Color) -> Style = Style(c, bg, attrs)
+  // This style with the foreground `c`.
+  withFg(c: Color) -> Style = Style(c, bg, attrs)
 
-    // This style with the background `c`.
-    withBg(c: Color) -> Style = Style(fg, c, attrs)
+  // This style with the background `c`.
+  withBg(c: Color) -> Style = Style(fg, c, attrs)
 
-    // This style with the attributes `a` added.
-    with(a: int) -> Style = Style(fg, bg, attrs | (a & AllAttributes))
+  // This style with the attributes `a` added.
+  with(a: int) -> Style = Style(fg, bg, attrs | (a & AllAttributes))
 
-    // This style with the attributes `a` taken away.
-    without(a: int) -> Style = Style(fg, bg, attrs & ~a)
+  // This style with the attributes `a` taken away.
+  without(a: int) -> Style = Style(fg, bg, attrs & ~a)
 
-    // Whether every attribute of `a` is on.
-    has(a: int) -> bool = (attrs & a) == a
+  // Whether every attribute of `a` is on.
+  has(a: int) -> bool = (attrs & a) == a

@@ -20,17 +20,17 @@ data Proc(
 )
 
 impl Proc
-    // Whether it has ended and waits for its parent to collect it.
-    isZombie() -> bool = state.startsWith("Z")
+  // Whether it has ended and waits for its parent to collect it.
+  isZombie() -> bool = state.startsWith("Z")
 
-    // Whether it is running or ready to run.
-    isRunning() -> bool = state.startsWith("R")
+  // Whether it is running or ready to run.
+  isRunning() -> bool = state.startsWith("R")
 
 // One processor's time since the machine started, in the system's ticks.
 data Ticks(user: long, system: long, idle: long)
 
 impl Ticks
-    total() -> long = user + system + idle
+  total() -> long = user + system + idle
 
 // Memory in bytes: all there is, and what is in use split as htop shows it: `used` held by programs
 // and the system (active and wired pages), `compressed` held by the compressor, `cached` that the
@@ -61,7 +61,7 @@ data Sample(
 // Where samples come from. The one this program has runs the system's commands and reads their
 // output; one that asks the kernel directly can take its place without anything else changing.
 trait Source
-    sample() -> Result[Sample, string]
+  sample() -> Result[Sample, string]
 
-    // A sentence saying where the numbers come from and what they lack, for the help screen.
-    describe() -> string
+  // A sentence saying where the numbers come from and what they lack, for the help screen.
+  describe() -> string

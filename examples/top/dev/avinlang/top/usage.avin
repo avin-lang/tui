@@ -7,7 +7,7 @@ module dev.avinlang.top
 data CpuShare(user: real, system: real)
 
 impl CpuShare
-    busy() -> real = user + system
+  busy() -> real = user + system
 
 // What the processors did between two samples: in all, per processor where the source reads them
 // (empty where it does not), and each process's share of one processor, in percent, by pid.
@@ -17,66 +17,69 @@ data Usage(total: CpuShare, cores: Vector[CpuShare], procs: Map[long, real])
 // read as idle and each process gets the system's own recent average.
 usage(before: Option[Sample], after: Sample) -> Usage
 usage(None, s) = Usage(CpuShare(0.0, 0.0), s.cores.map(_ -> CpuShare(0.0, 0.0)), firstLook(s.procs))
-usage(Some(b), s) =
-    val gone = HashMap[long, Proc]() ++ b.procs.map(p -> (p.pid, p))
-    val wall = s.at - b.at
-    val ticked = s.cores.nonEmpty && b.cores.length == s.cores.length
-    val cores = if ticked then b.cores.zip(s.cores).map(between) else s.cores.map(_ -> CpuShare(0.0, 0.0))
-    var procs = HashMap[long, real]()
-    var userSum: long = 0
-    var systemSum: long = 0
-    for p in s.procs
-        val (du, ds) = grown(gone.get(p.pid), p)
-        userSum += du
-        systemSum += ds
-        procs = procs.updated(p.pid, percentOf(du + ds, wall))
-    val total =
-        if ticked then sumShares(b.cores, s.cores)
-        else
-            val capacity = real(wall) / 10000.0 * real(maxOf(long(s.cpus), 1))
-            if capacity <= 0.0 then CpuShare(0.0, 0.0)
-            else held(CpuShare(real(userSum) / capacity, real(systemSum) / capacity))
-    Usage(total, cores, procs)
 
-private firstLook(procs: Vector[Proc]) -> Map[long, real] = HashMap[long, real]() ++ procs.map(p -> (p.pid, p.cpuPercent))
+usage(Some(b), s) =
+  val gone = HashMap[long, Proc]() ++ b.procs.map(p -> (p.pid, p))
+  val wall = s.at - b.at
+  val ticked = s.cores.nonEmpty && b.cores.length == s.cores.length
+  val cores = if ticked then b.cores.zip(s.cores).map(between) else s.cores.map(_ -> CpuShare(0.0, 0.0))
+  var procs = HashMap[long, real]()
+  var userSum: long = 0
+  var systemSum: long = 0
+  for p in s.procs
+    val (du, ds) = grown(gone.get(p.pid), p)
+    userSum += du
+    systemSum += ds
+    procs = procs.updated(p.pid, percentOf(du + ds, wall))
+  val total =
+    if ticked then sumShares(b.cores, s.cores)
+    else
+      val capacity = real(wall) / 10000.0 * real(maxOf(long(s.cpus), 1))
+      if capacity <= 0.0 then CpuShare(0.0, 0.0)
+      else held(CpuShare(real(userSum) / capacity, real(systemSum) / capacity))
+  Usage(total, cores, procs)
+
+private firstLook(procs: Vector[Proc]) -> Map[long, real] = HashMap[long, real]() ++ procs.map(
+  p -> (p.pid, p.cpuPercent)
+)
 
 // The user and system hundredths `p` used since `before`, its earlier self. A process with no earlier
 // self, or one whose times went down (its pid was taken by a new process), started since: all its
 // time is new.
 private grown(before: Option[Proc], p: Proc) -> (long, long)
-    val system = maxOf(p.cpuTime - p.userTime, 0)
-    before match
-        Some(b) if b.command == p.command && b.cpuTime <= p.cpuTime && b.userTime <= p.userTime ->
-            val bs = maxOf(b.cpuTime - b.userTime, 0)
-            (p.userTime - b.userTime, maxOf(system - bs, 0))
-        _ -> (p.userTime, system)
+  val system = maxOf(p.cpuTime - p.userTime, 0)
+  before match
+    Some(b) if b.command == p.command && b.cpuTime <= p.cpuTime && b.userTime <= p.userTime ->
+      val bs = maxOf(b.cpuTime - b.userTime, 0)
+      (p.userTime - b.userTime, maxOf(system - bs, 0))
+    _ -> (p.userTime, system)
 
 // `hundredths` of a second of processor time over `wall` microseconds, as a percent of one processor.
 percentOf(hundredths: long, wall: long) -> real =
-    if wall <= 0 then 0.0 else real(hundredths) * 10000.0 / real(wall) * 100.0
+  if wall <= 0 then 0.0 else real(hundredths) * 10000.0 / real(wall) * 100.0
 
 // One processor's share between two readings of its ticks.
 private between(pair: (Ticks, Ticks)) -> CpuShare
-    val (a, b) = pair
-    shareOf(b.user - a.user, b.system - a.system, b.total() - a.total())
+  val (a, b) = pair
+  shareOf(b.user - a.user, b.system - a.system, b.total() - a.total())
 
 private sumShares(a: Vector[Ticks], b: Vector[Ticks]) -> CpuShare
-    var du: long = 0
-    var ds: long = 0
-    var dt: long = 0
-    for (x, y) in a.zip(b)
-        du += y.user - x.user
-        ds += y.system - x.system
-        dt += y.total() - x.total()
-    shareOf(du, ds, dt)
+  var du: long = 0
+  var ds: long = 0
+  var dt: long = 0
+  for (x, y) in a.zip(b)
+    du += y.user - x.user
+    ds += y.system - x.system
+    dt += y.total() - x.total()
+  shareOf(du, ds, dt)
 
 private shareOf(user: long, system: long, total: long) -> CpuShare =
-    if total <= 0 then CpuShare(0.0, 0.0) else held(CpuShare(real(user) / real(total), real(system) / real(total)))
+  if total <= 0 then CpuShare(0.0, 0.0) else held(CpuShare(real(user) / real(total), real(system) / real(total)))
 
 // The share with each part at least 0 and the two together at most 1, the system's part cut first.
 private held(s: CpuShare) -> CpuShare
-    val u = clamp01(s.user)
-    CpuShare(u, minOfReal(clamp01(s.system), 1.0 - u))
+  val u = clamp01(s.user)
+  CpuShare(u, minOfReal(clamp01(s.system), 1.0 - u))
 
 private clamp01(x: real) -> real = if x.isNaN || x <= 0.0 then 0.0 else if x > 1.0 then 1.0 else x
 private minOfReal(a: real, b: real) -> real = if a < b then a else b

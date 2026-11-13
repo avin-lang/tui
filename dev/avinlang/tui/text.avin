@@ -5,9 +5,9 @@ module dev.avinlang.tui
 // two clusters, filling each line, so nothing is dropped (see `wrapChars`); `Ellipsis` keeps each line
 // of the text on one row, cut with `…`.
 data Overflow
-    Wrap
-    WrapChars
-    Ellipsis
+  Wrap
+  WrapChars
+  Ellipsis
 
 // `text` broken into lines of at most `width` columns, measured cluster by cluster.
 //
@@ -17,29 +17,29 @@ data Overflow
 // two-column cluster in a width of 1 is given a line of its own, which it overflows. An empty text is
 // one empty line; a width of 0 or less has room for no line.
 wrap(text: string, width: int) -> Vector[string]
-    val out = Vector.newBuilder[string]()
-    if width <= 0 then return out.result()
-    for para in text.split("\n")
-        wrapLine(para, width, out)
-    out.result()
+  val out = Vector.newBuilder[string]()
+  if width <= 0 then return out.result()
+  for para in text.split("\n")
+    wrapLine(para, width, out)
+  out.result()
 
 private wrapLine(para: string, width: int, out: Builder[string, Vector[string]])
-    val rows = Wrapper(width, out)
-    // Spaces seen since the last word, held until the next word shows whether they fit.
-    var spaces = 0
-    val word = Buffer[Cluster]()
-    for c in clusters(para)
-        if c.text == " "
-            if word.length > 0
-                rows.place(spaces, word)
-                word.clear()
-                spaces = 0
-            spaces += 1
-        else
-            word.addOne(c)
-    if word.length > 0 then rows.place(spaces, word)
-    else if rows.isBlank() then rows.spaces(minOf(spaces, width))
-    rows.newRow()
+  val rows = Wrapper(width, out)
+  // Spaces seen since the last word, held until the next word shows whether they fit.
+  var spaces = 0
+  val word = Buffer[Cluster]()
+  for c in clusters(para)
+    if c.text == " "
+      if word.length > 0
+        rows.place(spaces, word)
+        word.clear()
+        spaces = 0
+      spaces += 1
+    else
+      word.addOne(c)
+  if word.length > 0 then rows.place(spaces, word)
+  else if rows.isBlank() then rows.spaces(minOf(spaces, width))
+  rows.newRow()
 
 // `text` broken into lines of at most `width` columns between any two clusters, each line filled as
 // far as the next cluster fits: for a command line or a path, where a break at a space would read as
@@ -50,156 +50,200 @@ private wrapLine(para: string, width: int, out: Builder[string, Vector[string]])
 // is given a line of its own, which it overflows. An empty text is one empty line; a width of 0 or
 // less has room for no line.
 wrapChars(text: string, width: int) -> Vector[string]
-    val out = Vector.newBuilder[string]()
-    if width <= 0 then return out.result()
-    for para in text.split("\n")
-        var row = StringWriter()
-        var used = 0
-        for c in clusters(para)
-            if used + c.width > width && used > 0
-                out.addOne(row.text)
-                row = StringWriter()
-                used = 0
-            row.write(c.text)
-            used += c.width
-        out.addOne(row.text)
-    out.result()
-
-// The rows one line of text is broken into, filled a word at a time.
-private class Wrapper(val width: int, val out: Builder[string, Vector[string]])
+  val out = Vector.newBuilder[string]()
+  if width <= 0 then return out.result()
+  for para in text.split("\n")
     var row = StringWriter()
     var used = 0
-    // Whether the row holds a word, and whether it is the first row of the line of text.
-    var hasWord = false
-    var first = true
-
-    // Whether nothing has been put in any row yet.
-    isBlank() -> bool = first && !hasWord
-
-    // Puts `word` after `spaces` spaces: on this row where it fits, or on the next, broken between
-    // clusters where it is wider than a whole row. Spaces are kept between two words of a row and at
-    // the start of the first row where the word after them fits, and dropped where the row breaks.
-    place(spaces: int, word: Buffer[Cluster])
-        var w = 0
-        for c in word
-            w += c.width
-        val lead = if hasWord || first then spaces else 0
-        if used + lead + w <= width then self.spaces(lead)
-        else if hasWord then newRow()
-        for c in word
-            if used + c.width > width && used > 0 then newRow()
-            row.write(c.text)
-            used += c.width
-        hasWord = true
-
-    // Puts `n` spaces on this row.
-    spaces(n: int)
-        for _ in 0 ..< n
-            row.write(" ")
-        used += n
-
-    // Ends this row and starts the next.
-    newRow()
+    for c in clusters(para)
+      if used + c.width > width && used > 0
         out.addOne(row.text)
         row = StringWriter()
         used = 0
-        hasWord = false
-        first = false
+      row.write(c.text)
+      used += c.width
+    out.addOne(row.text)
+  out.result()
+
+// The rows one line of text is broken into, filled a word at a time.
+private class Wrapper(val width: int, val out: Builder[string, Vector[string]])
+  var row = StringWriter()
+  var used = 0
+  // Whether the row holds a word, and whether it is the first row of the line of text.
+  var hasWord = false
+  var first = true
+
+  // Whether nothing has been put in any row yet.
+  isBlank() -> bool = first && !hasWord
+
+  // Puts `word` after `spaces` spaces: on this row where it fits, or on the next, broken between
+  // clusters where it is wider than a whole row. Spaces are kept between two words of a row and at
+  // the start of the first row where the word after them fits, and dropped where the row breaks.
+  place(spaces: int, word: Buffer[Cluster])
+    var w = 0
+    for c in word
+      w += c.width
+    val lead = if hasWord || first then spaces else 0
+    if used + lead + w <= width then self.spaces(lead)
+    else if hasWord then newRow()
+    for c in word
+      if used + c.width > width && used > 0 then newRow()
+      row.write(c.text)
+      used += c.width
+    hasWord = true
+
+  // Puts `n` spaces on this row.
+  spaces(n: int)
+    for _ in 0 ..< n
+      row.write(" ")
+    used += n
+
+  // Ends this row and starts the next.
+  newRow()
+    out.addOne(row.text)
+    row = StringWriter()
+    used = 0
+    hasWord = false
+    first = false
 
 // `text` with `…` at its end inside `width` columns: as much of it as fits in `width - 1` columns,
 // then the ellipsis. For a last line that stands for more text than is shown.
 withEllipsis(text: string, width: int) -> string
-    if width <= 0 then return ""
-    val out = StringWriter()
-    var used = 0
-    for c in clusters(text)
-        if used + c.width > width - 1 then break
-        out.write(c.text)
-        used += c.width
-    out.write("…")
-    out.text
+  if width <= 0 then return ""
+  val out = StringWriter()
+  var used = 0
+  for c in clusters(text)
+    if used + c.width > width - 1 then break
+    out.write(c.text)
+    used += c.width
+  out.write("…")
+  out.text
 
 // A piece of text and the style it is drawn in; `None` takes the style of what it is drawn in, the
 // row of a table it is a cell of, say.
 data Span(text: string, style: Option[Style] = None)
 
 impl Grid
-    // Draws `text` in `r` in `style`, wrapped to its width or each line cut with `…`, as `overflow`
-    // says, and placed in the width by `align` (-1 left, 0 centred, 1 right). Where there are more
-    // lines than `r` has rows, the last row shown ends with `…`. Answers how many rows the whole text
-    // takes at this width, shown or not, so a caller can size a rectangle to it.
-    textBlock(r: Rect, text: string, style: Style = Style.plain(), overflow: Overflow = Wrap, align: int = -1, clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)) -> int
-        if r.w <= 0 then return 0
-        val lines = overflow match
-            Wrap -> wrap(text, r.w)
-            WrapChars -> wrapChars(text, r.w)
-            Ellipsis -> text.split("\n").map(l -> fitted(l, r.w)).toVector
-        val c = r.intersect(clip)
-        val shown = minOf(lines.length,maxOf(r.h, 0))
-        for k in 0 ..< shown
-            val line = if k == shown - 1 && shown < lines.length then withEllipsis(lines(k), r.w) else lines(k)
-            val lw = textWidth(line)
-            val before = if align < 0 || lw >= r.w then 0 else if align == 0 then (r.w - lw) / 2 else r.w - lw
-            self.text(r.x + before, r.y + k, line, style, c)
-        lines.length
+  // Draws `text` in `r` in `style`, wrapped to its width or each line cut with `…`, as `overflow`
+  // says, and placed in the width by `align` (-1 left, 0 centred, 1 right). Where there are more
+  // lines than `r` has rows, the last row shown ends with `…`. Answers how many rows the whole text
+  // takes at this width, shown or not, so a caller can size a rectangle to it.
+  textBlock(
+      r: Rect,
+      text: string,
+      style: Style = Style.plain(),
+      overflow: Overflow = Wrap,
+      align: int = -1,
+      clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)
+  ) -> int
+    if r.w <= 0 then return 0
+    val lines = overflow match
+      Wrap -> wrap(text, r.w)
+      WrapChars -> wrapChars(text, r.w)
+      Ellipsis -> text.split("\n").map(l -> fitted(l, r.w)).toVector
+    val c = r.intersect(clip)
+    val shown = minOf(lines.length, maxOf(r.h, 0))
+    for k in 0 ..< shown
+      val line = if k == shown - 1 && shown < lines.length then withEllipsis(lines(k), r.w) else lines(k)
+      val lw = textWidth(line)
+      val before = if align < 0 || lw >= r.w then 0 else if align == 0 then (r.w - lw) / 2 else r.w - lw
+      self.text(r.x + before, r.y + k, line, style, c)
+    lines.length
 
-    // Draws a horizontal line of `ch`, `width` columns from column `x` of row `y`.
-    hline(x: int, y: int, width: int, style: Style = Style.plain(), ch: char = '─', clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue))
-        val c = clip.intersect(area())
-        for i in 0 ..< maxOf(width, 0)
-            if c.contains(x + i, y) then putChar(x + i, y, ch, style)
+  // Draws a horizontal line of `ch`, `width` columns from column `x` of row `y`.
+  hline(
+      x: int,
+      y: int,
+      width: int,
+      style: Style = Style.plain(),
+      ch: char = '─',
+      clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)
+  )
+    val c = clip.intersect(area())
+    for i in 0 ..< maxOf(width, 0)
+      if c.contains(x + i, y) then putChar(x + i, y, ch, style)
 
-    // Draws a vertical line of `ch`, `height` rows down from column `x` of row `y`.
-    vline(x: int, y: int, height: int, style: Style = Style.plain(), ch: char = '│', clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue))
-        val c = clip.intersect(area())
-        for i in 0 ..< maxOf(height, 0)
-            if c.contains(x, y + i) then putChar(x, y + i, ch, style)
+  // Draws a vertical line of `ch`, `height` rows down from column `x` of row `y`.
+  vline(
+      x: int,
+      y: int,
+      height: int,
+      style: Style = Style.plain(),
+      ch: char = '│',
+      clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)
+  )
+    val c = clip.intersect(area())
+    for i in 0 ..< maxOf(height, 0)
+      if c.contains(x, y + i) then putChar(x, y + i, ch, style)
 
-    // Draws pieces of text one after another along row `y` from column `x`, each in its own style or,
-    // where it has none, in `style`. Answers the column after the last.
-    spans(x: int, y: int, parts: Vector[Span], style: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)) -> int
-        var col = x
-        for p in parts
-            col = text(col, y, p.text, p.style.getOrElse(style), clip)
-        col
+  // Draws pieces of text one after another along row `y` from column `x`, each in its own style or,
+  // where it has none, in `style`. Answers the column after the last.
+  spans(
+      x: int,
+      y: int,
+      parts: Vector[Span],
+      style: Style = Style.plain(),
+      clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)
+  ) -> int
+    var col = x
+    for p in parts
+      col = text(col, y, p.text, p.style.getOrElse(style), clip)
+    col
 
-    // Draws a row of key hints from column `x` of row `y`: each key in `keyStyle`, `sep` blank columns,
-    // what it does in `textStyle`, and `gap` blank columns before the next, as `q quit  ↑↓ move` with
-    // the defaults. A hint with nothing to say is its key alone, with no `sep` after it. The blanks are
-    // left as they are, not drawn.
-    //
-    // A hint that would not fit whole inside `clip` and the grid is left out with every hint after
-    // it, and the answer is the column after the last hint drawn. With `cut`, every hint is drawn and
-    // cut at the edge instead, as text is, and the answer is the column after the last of them as if
-    // all were shown, which may be past the edge.
-    keyHints(x: int, y: int, hints: Vector[(string, string)], keyStyle: Style = Style.plain().with(Bold), textStyle: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue), sep: int = 1, gap: int = 2, cut: bool = false) -> int
-        val c = clip.intersect(area())
-        val between = maxOf(sep, 0)
-        var col = x
-        var first = true
-        for (key, what) in hints
-            val before = if first then 0 else maxOf(gap, 0)
-            val w = textWidth(key) + (if what.isEmpty then 0 else between + textWidth(what))
-            if !cut && col + before + w > c.right() then break
-            col += before
-            col = text(col, y, key, keyStyle, c)
-            if what.nonEmpty then col = text(col + between, y, what, textStyle, c)
-            first = false
-        col
+  // Draws a row of key hints from column `x` of row `y`: each key in `keyStyle`, `sep` blank columns,
+  // what it does in `textStyle`, and `gap` blank columns before the next, as `q quit  ↑↓ move` with
+  // the defaults. A hint with nothing to say is its key alone, with no `sep` after it. The blanks are
+  // left as they are, not drawn.
+  //
+  // A hint that would not fit whole inside `clip` and the grid is left out with every hint after
+  // it, and the answer is the column after the last hint drawn. With `cut`, every hint is drawn and
+  // cut at the edge instead, as text is, and the answer is the column after the last of them as if
+  // all were shown, which may be past the edge.
+  keyHints(
+      x: int,
+      y: int,
+      hints: Vector[(string, string)],
+      keyStyle: Style = Style.plain().with(Bold),
+      textStyle: Style = Style.plain(),
+      clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue),
+      sep: int = 1,
+      gap: int = 2,
+      cut: bool = false
+  ) -> int
+    val c = clip.intersect(area())
+    val between = maxOf(sep, 0)
+    var col = x
+    var first = true
+    for (key, what) in hints
+      val before = if first then 0 else maxOf(gap, 0)
+      val w = textWidth(key) + (if what.isEmpty then 0 else between + textWidth(what))
+      if !cut && col + before + w > c.right() then break
+      col += before
+      col = text(col, y, key, keyStyle, c)
+      if what.nonEmpty then col = text(col + between, y, what, textStyle, c)
+      first = false
+    col
 
-    // Draws one label and value to a row of `r`, from its top, as long as there are rows: the labels in
-    // a column as wide as the widest of them and `gap` more, in `labelStyle`, and the values after
-    // them in `valueStyle`, cut with `…` at the right edge of `r`. Answers the rows drawn.
-    labelValues(r: Rect, pairs: Vector[(string, string)], labelStyle: Style = Style.plain().with(Bold), valueStyle: Style = Style.plain(), gap: int = 1, clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)) -> int
-        if r.isEmpty() then return 0
-        var widest = 0
-        for (label, _) in pairs
-            widest = maxOf(widest, textWidth(label))
-        val valueX = r.x + widest + maxOf(gap, 0)
-        val c = r.intersect(clip)
-        val n = minOf(pairs.length, r.h)
-        for k in 0 ..< n
-            val (label, value) = pairs(k)
-            text(r.x, r.y + k, fitted(label, r.w), labelStyle, c)
-            if valueX < r.right() then text(valueX, r.y + k, fitted(value, r.right() - valueX), valueStyle, c)
-        n
+  // Draws one label and value to a row of `r`, from its top, as long as there are rows: the labels in
+  // a column as wide as the widest of them and `gap` more, in `labelStyle`, and the values after
+  // them in `valueStyle`, cut with `…` at the right edge of `r`. Answers the rows drawn.
+  labelValues(
+      r: Rect,
+      pairs: Vector[(string, string)],
+      labelStyle: Style = Style.plain().with(Bold),
+      valueStyle: Style = Style.plain(),
+      gap: int = 1,
+      clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue)
+  ) -> int
+    if r.isEmpty() then return 0
+    var widest = 0
+    for (label, _) in pairs
+      widest = maxOf(widest, textWidth(label))
+    val valueX = r.x + widest + maxOf(gap, 0)
+    val c = r.intersect(clip)
+    val n = minOf(pairs.length, r.h)
+    for k in 0 ..< n
+      val (label, value) = pairs(k)
+      text(r.x, r.y + k, fitted(label, r.w), labelStyle, c)
+      if valueX < r.right() then text(valueX, r.y + k, fitted(value, r.right() - valueX), valueStyle, c)
+    n

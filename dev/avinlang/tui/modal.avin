@@ -3,119 +3,124 @@ module dev.avinlang.tui
 // A box drawn over the rest of the screen that takes the input while it is open: a help screen, a
 // question. A `ModalStack` draws its border and title and gives it the inside to draw in.
 trait Modal
-    // The title set into the top of the border; empty for none.
-    title() -> string
+  // The title set into the top of the border; empty for none.
+  title() -> string
 
-    // The columns and rows it would like inside the border, given the most there is room for.
-    measure(maxWidth: int, maxHeight: int) -> (int, int)
+  // The columns and rows it would like inside the border, given the most there is room for.
+  measure(maxWidth: int, maxHeight: int) -> (int, int)
 
-    // Draws it into `r`, the inside of its border.
-    draw(g: Grid, r: Rect)
+  // Draws it into `r`, the inside of its border.
+  draw(g: Grid, r: Rect)
 
-    // Takes an event and answers whether it stays open.
-    handle(e: Event) -> bool
+  // Takes an event and answers whether it stays open.
+  handle(e: Event) -> bool
 
 // Modals over a screen, the last pushed on top. Each is drawn centred over the one before, so the top
 // one is whole; `handle` gives events to the top one alone and pops it when it closes.
 class ModalStack()
-    private val stack: Buffer[Modal] = Buffer[Modal]()
-    // The style of a modal's inside and of its border, and the border's lines.
-    var style: Style = Style.plain()
-    var borderStyle: Style = Style.fg(Cyan)
-    var border: Border = Rounded
+  private val stack: Buffer[Modal] = Buffer[Modal]()
+  // The style of a modal's inside and of its border, and the border's lines.
+  var style: Style = Style.plain()
+  var borderStyle: Style = Style.fg(Cyan)
+  var border: Border = Rounded
 
-    // Whether no modal is open.
-    isEmpty() -> bool = stack.length == 0
+  // Whether no modal is open.
+  isEmpty() -> bool = stack.length == 0
 
-    // How many are open.
-    length() -> int = stack.length
+  // How many are open.
+  length() -> int = stack.length
 
-    // Opens `m` over the others.
-    push(m: Modal)
-        stack.addOne(m)
+  // Opens `m` over the others.
+  push(m: Modal)
+    stack.addOne(m)
 
-    // Closes the top one, and answers it.
-    pop() -> Option[Modal] = if isEmpty() then None else Some(stack.remove(stack.length - 1))
+  // Closes the top one, and answers it.
+  pop() -> Option[Modal] = if isEmpty() then None else Some(stack.remove(stack.length - 1))
 
-    // The top one, if any.
-    top() -> Option[Modal] = if isEmpty() then None else Some(stack(stack.length - 1))
+  // The top one, if any.
+  top() -> Option[Modal] = if isEmpty() then None else Some(stack(stack.length - 1))
 
-    // Closes them all.
-    clear()
-        stack.clear()
+  // Closes them all.
+  clear()
+    stack.clear()
 
-    // Gives `e` to the top modal, popping it when it answers that it closes, and answers whether
-    // the event was taken: a key, mouse event or paste is taken whenever a modal is open, so nothing
-    // under it sees one. A `Resize` or a `Stop` is never taken, so the program still sees them.
-    handle(e: Event) -> bool
-        if isEmpty() then return false
-        e match
-            Resize(_, _) -> return false
-            Stop(_) -> return false
-            _ -> ()
-        if !stack(stack.length - 1).handle(e) then pop()
-        true
+  // Gives `e` to the top modal, popping it when it answers that it closes, and answers whether
+  // the event was taken: a key, mouse event or paste is taken whenever a modal is open, so nothing
+  // under it sees one. A `Resize` or a `Stop` is never taken, so the program still sees them.
+  handle(e: Event) -> bool
+    if isEmpty() then return false
+    e match
+      Resize(_, _) -> return false
+      Stop(_) -> return false
+      _ -> ()
+    if !stack(stack.length - 1).handle(e) then pop()
+    true
 
-    // The rectangle `m` takes in `area`, border included: its measure centred, held to `area`.
-    place(m: Modal, area: Rect) -> Rect
-        val (w, h) = m.measure(maxOf(area.w - 2, 0), maxOf(area.h - 2, 0))
-        area.centered(maxOf(w, 0) + 2, maxOf(h, 0) + 2)
+  // The rectangle `m` takes in `area`, border included: its measure centred, held to `area`.
+  place(m: Modal, area: Rect) -> Rect
+    val (w, h) = m.measure(maxOf(area.w - 2, 0), maxOf(area.h - 2, 0))
+    area.centered(maxOf(w, 0) + 2, maxOf(h, 0) + 2)
 
-    // Draws every modal over `area`, bottom first: each one's rectangle cleared to `style`, its border
-    // and title, and the modal inside.
-    draw(g: Grid, area: Rect)
-        for m in stack
-            val r = place(m, area)
-            if r.isEmpty() then continue
-            g.fill(r.x, r.y, r.w, r.h, style)
-            g.box(r, borderStyle, border, m.title())
-            val inside = r.inset(1)
-            if !inside.isEmpty() then m.draw(g, inside)
+  // Draws every modal over `area`, bottom first: each one's rectangle cleared to `style`, its border
+  // and title, and the modal inside.
+  draw(g: Grid, area: Rect)
+    for m in stack
+      val r = place(m, area)
+      if r.isEmpty() then continue
+      g.fill(r.x, r.y, r.w, r.h, style)
+      g.box(r, borderStyle, border, m.title())
+      val inside = r.inset(1)
+      if !inside.isEmpty() then m.draw(g, inside)
 
 // A modal showing text, wrapped to fit, that any key or click closes: a help screen, a message.
 class MessageBox(val heading: string, val text: string, val style: Style = Style.plain()): Modal
-    override title() -> string = heading
+  override title() -> string = heading
 
-    // As wide as the longest line, the title or the room there is allows, one column of padding each
-    // side; as high as the text wraps to.
-    override measure(maxWidth: int, maxHeight: int) -> (int, int)
-        var widest = textWidth(heading) + 2
-        for line in text.split("\n")
-            widest = maxOf(widest, textWidth(line) + 2)
-        val w = minOf(widest, maxWidth)
-        (w, minOf(wrap(text, maxOf(w - 2, 1)).length, maxHeight))
+  // As wide as the longest line, the title or the room there is allows, one column of padding each
+  // side; as high as the text wraps to.
+  override measure(maxWidth: int, maxHeight: int) -> (int, int)
+    var widest = textWidth(heading) + 2
+    for line in text.split("\n")
+      widest = maxOf(widest, textWidth(line) + 2)
+    val w = minOf(widest, maxWidth)
+    (w, minOf(wrap(text, maxOf(w - 2, 1)).length, maxHeight))
 
-    override draw(g: Grid, r: Rect)
-        g.textBlock(r.pad(1, 0), text, style)
+  override draw(g: Grid, r: Rect)
+    g.textBlock(r.pad(1, 0), text, style)
 
-    override handle(e: Event) -> bool
-        e match
-            KeyPress(_, _) -> false
-            Mouse(m) -> m.action != Press
-            _ -> true
+  override handle(e: Event) -> bool
+    e match
+      KeyPress(_, _) -> false
+      Mouse(m) -> m.action != Press
+      _ -> true
 
 // A question answered with `y` or `n`: `answer` is called with true for `y` or `Y`, false for `n`,
 // `N` or Escape, and the box closes; any other key leaves it open.
-class Confirm(val heading: string, val question: string, val answer: (bool) -> unit, val style: Style = Style.plain()): Modal
-    override title() -> string = heading
+class Confirm(
+    val heading: string,
+    val question: string,
+    val answer: (bool) -> unit,
+    val style: Style = Style.plain()
+): Modal
+  override title() -> string = heading
 
-    override measure(maxWidth: int, maxHeight: int) -> (int, int)
-        val w = minOf(maxOf(maxOf(textWidth(question), textWidth(Prompt)), textWidth(heading)) + 2, maxWidth)
-        (w, minOf(wrap(question, maxOf(w - 2, 1)).length + 2, maxHeight))
+  override measure(maxWidth: int, maxHeight: int) -> (int, int)
+    val w = minOf(maxOf(maxOf(textWidth(question), textWidth(Prompt)), textWidth(heading)) + 2, maxWidth)
+    (w, minOf(wrap(question, maxOf(w - 2, 1)).length + 2, maxHeight))
 
-    override draw(g: Grid, r: Rect)
-        val inside = r.pad(1, 0)
-        g.textBlock(Rect(inside.x, inside.y, inside.w, maxOf(inside.h - 2, 1)), question, style)
-        if inside.h >= 3 then g.textIn(inside.x, inside.bottom() - 1, inside.w, Prompt, style.with(Bold), 0, inside)
+  override draw(g: Grid, r: Rect)
+    val inside = r.pad(1, 0)
+    g.textBlock(Rect(inside.x, inside.y, inside.w, maxOf(inside.h - 2, 1)), question, style)
+    if inside.h >= 3 then g.textIn(inside.x, inside.bottom() - 1, inside.w, Prompt, style.with(Bold), 0, inside)
 
-    override handle(e: Event) -> bool
-        e match
-            KeyPress(Char('y'), _) -> answer(true)
-            KeyPress(Char('Y'), _) -> answer(true)
-            KeyPress(Char('n'), _) -> answer(false)
-            KeyPress(Char('N'), _) -> answer(false)
-            KeyPress(Escape, _) -> answer(false)
-            _ -> return true
-        false
+  override handle(e: Event) -> bool
+    e match
+      KeyPress(Char('y'), _) -> answer(true)
+      KeyPress(Char('Y'), _) -> answer(true)
+      KeyPress(Char('n'), _) -> answer(false)
+      KeyPress(Char('N'), _) -> answer(false)
+      KeyPress(Escape, _) -> answer(false)
+      _ -> return true
+    false
 
 private val Prompt: string = "y yes  n no"

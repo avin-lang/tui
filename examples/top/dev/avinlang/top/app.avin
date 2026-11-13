@@ -1,25 +1,56 @@
 module dev.avinlang.top
 
-import dev.avinlang.tui.{Backspace, Black, Bold, Char, Column, Ctrl, Cyan, Down, End, Enter, Escape, Event, F,
-                         Grid, Home, Key, KeyPress, Mouse, PageDown, PageUp, Paste, Rect, Red, Rounded, ScrollDown,
-                         ScrollUp, Stop, Style, Table, Up, Yellow, textWidth}
+import dev.avinlang.tui.{
+  Backspace,
+  Black,
+  Bold,
+  Char,
+  Column,
+  Ctrl,
+  Cyan,
+  Down,
+  End,
+  Enter,
+  Escape,
+  Event,
+  F,
+  Grid,
+  Home,
+  Key,
+  KeyPress,
+  Mouse,
+  PageDown,
+  PageUp,
+  Paste,
+  Rect,
+  Red,
+  Rounded,
+  ScrollDown,
+  ScrollUp,
+  Stop,
+  Style,
+  Table,
+  Up,
+  Yellow,
+  textWidth
+}
 
 // What the program does after a key: nothing beyond drawing again, end, or send `Terminate` to a
 // process.
 data Action
-    Stay
-    Quit
-    Kill(pid: long)
+  Stay
+  Quit
+  Kill(pid: long)
 
 // The table's columns, in the order `cells` gives a row's text.
 val columns: Vector[Column] = [
-    Column("PID", 7, 1),
-    Column("USER", 9),
-    Column("CPU%", 5, 1),
-    Column("MEM%", 5, 1),
-    Column("RES", 6, 1),
-    Column("TIME+", 9, 1),
-    Column("COMMAND", 0)
+  Column("PID", 7, 1),
+  Column("USER", 9),
+  Column("CPU%", 5, 1),
+  Column("MEM%", 5, 1),
+  Column("RES", 6, 1),
+  Column("TIME+", 9, 1),
+  Column("COMMAND", 0)
 ]
 
 // Which column each sort key sorts.
@@ -33,212 +64,219 @@ sortColumn(ByTime) = 5
 // help, a kill waiting for its yes, the last message, and the table's selection, which follows its
 // process from one look to the next.
 class App(val sourceNote: string)
-    var sortKey: SortKey = ByCpu
-    var filter = ""
-    var editingFilter = false
-    var tree = false
-    var help = false
-    var confirming: Option[Proc] = None
-    var message = ""
-    val table: Table = Table(columns)
-    // The rows on screen, in their order, and the process selected among them.
-    var shown: Vector[Row] = []
-    var selectedPid: Option[long] = None
-    // The rows the table showed at the last draw, which a page key moves by.
-    var page = 1
+  var sortKey: SortKey = ByCpu
+  var filter = ""
+  var editingFilter = false
+  var tree = false
+  var help = false
+  var confirming: Option[Proc] = None
+  var message = ""
+  val table: Table = Table(columns)
+  // The rows on screen, in their order, and the process selected among them.
+  var shown: Vector[Row] = []
+  var selectedPid: Option[long] = None
+  // The rows the table showed at the last draw, which a page key moves by.
+  var page = 1
 
-    // The rows for `sample` and `usage` as the screen shows them, the selection kept on its process.
-    update(sample: Sample, usage: Usage)
-        val sorted = sortRows(filterRows(rowsOf(sample.procs, usage), filter), sortKey)
-        shown = if tree then treeRows(sorted) else sorted
-        val at = selectedPid match
-            Some(pid) -> shown.indexWhere(r -> r.proc.pid == pid)
-            None -> -1
-        table.select(if at >= 0 then at else table.selected, shown.length)
-        remember()
+  // The rows for `sample` and `usage` as the screen shows them, the selection kept on its process.
+  update(sample: Sample, usage: Usage)
+    val sorted = sortRows(filterRows(rowsOf(sample.procs, usage), filter), sortKey)
+    shown = if tree then treeRows(sorted) else sorted
+    val at = selectedPid match
+      Some(pid) -> shown.indexWhere(r -> r.proc.pid == pid)
+      None -> -1
+    table.select(if at >= 0 then at else table.selected, shown.length)
+    remember()
 
-    // The process selected, if any.
-    selected() -> Option[Proc] =
-        if 0 <= table.selected < shown.length then Some(shown(table.selected).proc) else None
+  // The process selected, if any.
+  selected() -> Option[Proc] =
+    if 0 <= table.selected < shown.length then Some(shown(table.selected).proc) else None
 
-    private remember()
-        selectedPid = selected().map(p -> p.pid)
+  private remember()
+    selectedPid = selected().map(p -> p.pid)
 
-    // Changes the state for `e` and says what to do next.
-    handle(e: Event) -> Action
-        if e is KeyPress(_, _) then message = ""
-        if confirming is Some(p)
-            confirming = None
-            return e match
-                KeyPress(Char('y'), _) -> Kill(p.pid)
-                KeyPress(Char('Y'), _) -> Kill(p.pid)
-                Stop(_) -> Quit
-                _ ->
-                    message = "not sent"
-                    Stay
-        if help
-            help = false
-            return if e is Stop(_) then Quit else Stay
-        if editingFilter then return filterKey(e)
-        e match
-            KeyPress(k, mods) -> key(k, mods)
-            Mouse(m) if m.action == ScrollUp -> move(-3)
-            Mouse(m) if m.action == ScrollDown -> move(3)
-            Stop(_) -> Quit
-            _ -> Stay
+  // Changes the state for `e` and says what to do next.
+  handle(e: Event) -> Action
+    if e is KeyPress(_, _) then message = ""
+    if confirming is Some(p)
+      confirming = None
+      return e match
+        KeyPress(Char('y'), _) -> Kill(p.pid)
+        KeyPress(Char('Y'), _) -> Kill(p.pid)
+        Stop(_) -> Quit
+        _ ->
+          message = "not sent"
+          Stay
+    if help
+      help = false
+      return if e is Stop(_) then Quit else Stay
+    if editingFilter then return filterKey(e)
+    e match
+      KeyPress(k, mods) -> key(k, mods)
+      Mouse(m) if m.action == ScrollUp -> move(-3)
+      Mouse(m) if m.action == ScrollDown -> move(3)
+      Stop(_) -> Quit
+      _ -> Stay
 
-    private key(k: Key, mods: int) -> Action
-        if (mods & Ctrl) != 0
-            return if k == Char('c') then Quit else Stay
-        k match
-            Char('q') -> Quit
-            F(10) -> Quit
-            Char('h') -> showHelp()
-            Char('?') -> showHelp()
-            F(1) -> showHelp()
-            Char('P') -> sortBy(ByCpu)
-            Char('M') -> sortBy(ByMem)
-            Char('T') -> sortBy(ByTime)
-            Char('N') -> sortBy(ByPid)
-            Char('t') -> toggleTree()
-            F(5) -> toggleTree()
-            Char('/') -> startFilter()
-            F(3) -> startFilter()
-            F(4) -> startFilter()
-            Char('k') -> askKill()
-            F(9) -> askKill()
-            Up -> move(-1)
-            Down -> move(1)
-            PageUp -> move(-page)
-            PageDown -> move(page)
-            Home -> moveTo(0)
-            End -> moveTo(shown.length - 1)
-            _ -> Stay
+  private key(k: Key, mods: int) -> Action
+    if (mods & Ctrl) != 0
+      return if k == Char('c') then Quit else Stay
+    k match
+      Char('q') -> Quit
+      F(10) -> Quit
+      Char('h') -> showHelp()
+      Char('?') -> showHelp()
+      F(1) -> showHelp()
+      Char('P') -> sortBy(ByCpu)
+      Char('M') -> sortBy(ByMem)
+      Char('T') -> sortBy(ByTime)
+      Char('N') -> sortBy(ByPid)
+      Char('t') -> toggleTree()
+      F(5) -> toggleTree()
+      Char('/') -> startFilter()
+      F(3) -> startFilter()
+      F(4) -> startFilter()
+      Char('k') -> askKill()
+      F(9) -> askKill()
+      Up -> move(-1)
+      Down -> move(1)
+      PageUp -> move(-page)
+      PageDown -> move(page)
+      Home -> moveTo(0)
+      End -> moveTo(shown.length - 1)
+      _ -> Stay
 
-    // Keys while the filter is typed: text goes into it, and the rows narrow as it does.
-    private filterKey(e: Event) -> Action
-        e match
-            KeyPress(Char(c), mods) if (mods & Ctrl) == 0 -> filter = filter + c.toString()
-            KeyPress(Backspace, _) -> filter = filter.dropRight(1)
-            KeyPress(Enter, _) -> editingFilter = false
-            KeyPress(Escape, _) ->
-                filter = ""
-                editingFilter = false
-            KeyPress(F(10), _) -> return Quit
-            Paste(text) -> filter = filter + text
-            Stop(_) -> return Quit
-            _ -> ()
-        Stay
+  // Keys while the filter is typed: text goes into it, and the rows narrow as it does.
+  private filterKey(e: Event) -> Action
+    e match
+      KeyPress(Char(c), mods) if (mods & Ctrl) == 0 -> filter = filter + c.toString()
+      KeyPress(Backspace, _) -> filter = filter.dropRight(1)
+      KeyPress(Enter, _) -> editingFilter = false
+      KeyPress(Escape, _) ->
+        filter = ""
+        editingFilter = false
+      KeyPress(F(10), _) -> return Quit
+      Paste(text) -> filter = filter + text
+      Stop(_) -> return Quit
+      _ -> ()
+    Stay
 
-    private showHelp() -> Action
-        help = true
-        Stay
+  private showHelp() -> Action
+    help = true
+    Stay
 
-    private sortBy(k: SortKey) -> Action
-        sortKey = k
-        Stay
+  private sortBy(k: SortKey) -> Action
+    sortKey = k
+    Stay
 
-    private toggleTree() -> Action
-        tree = !tree
-        Stay
+  private toggleTree() -> Action
+    tree = !tree
+    Stay
 
-    private startFilter() -> Action
-        editingFilter = true
-        Stay
+  private startFilter() -> Action
+    editingFilter = true
+    Stay
 
-    private askKill() -> Action
-        confirming = selected()
-        if confirming.isEmpty then message = "no process selected"
-        Stay
+  private askKill() -> Action
+    confirming = selected()
+    if confirming.isEmpty then message = "no process selected"
+    Stay
 
-    private move(n: int) -> Action
-        moveTo(table.selected + n)
+  private move(n: int) -> Action
+    moveTo(table.selected + n)
 
-    private moveTo(i: int) -> Action
-        table.select(i, shown.length)
-        remember()
-        Stay
+  private moveTo(i: int) -> Action
+    table.select(i, shown.length)
+    remember()
+    Stay
 
-    // Draws the whole screen for `sample` and `usage` into `g`: the meters and figures at the top, the
-    // table, the line of keys at the bottom, and the help over everything when it is open.
-    draw(g: Grid, sample: Sample, usage: Usage)
-        val top = drawHeader(g, sample, usage)
-        val area = Rect(0, top + 1, g.width, g.height - top - 2)
-        page = if area.h > 2 then area.h - 1 else 1
-        table.draw(g, area, shown.map(cells))
-        markSortColumn(g, area)
-        // The table may have moved the selection to keep it in range.
-        remember()
-        drawFooter(g, sample)
-        if help then drawHelp(g)
+  // Draws the whole screen for `sample` and `usage` into `g`: the meters and figures at the top, the
+  // table, the line of keys at the bottom, and the help over everything when it is open.
+  draw(g: Grid, sample: Sample, usage: Usage)
+    val top = drawHeader(g, sample, usage)
+    val area = Rect(0, top + 1, g.width, g.height - top - 2)
+    page = if area.h > 2 then area.h - 1 else 1
+    table.draw(g, area, shown.map(cells))
+    markSortColumn(g, area)
+    // The table may have moved the selection to keep it in range.
+    remember()
+    drawFooter(g, sample)
+    if help then drawHelp(g)
 
-    // Marks the heading of the column the rows are sorted by.
-    private markSortColumn(g: Grid, area: Rect)
-        if area.isEmpty() then return
-        val ws = table.widths(area.w)
-        var x = area.x
-        for j in 0 ..< sortColumn(sortKey)
-            x += ws(j) + 1
-        val j = sortColumn(sortKey)
-        g.textIn(x, area.y, ws(j), columns(j).title, Style(Black, Cyan, Bold), columns(j).align, area)
+  // Marks the heading of the column the rows are sorted by.
+  private markSortColumn(g: Grid, area: Rect)
+    if area.isEmpty() then return
+    val ws = table.widths(area.w)
+    var x = area.x
+    for j in 0 ..< sortColumn(sortKey)
+      x += ws(j) + 1
+    val j = sortColumn(sortKey)
+    g.textIn(x, area.y, ws(j), columns(j).title, Style(Black, Cyan, Bold), columns(j).align, area)
 
-    // The bottom line: a kill's question, the filter being typed, or the keys and the last message.
-    private drawFooter(g: Grid, sample: Sample)
-        if g.height < 1 then return
-        val y = g.height - 1
-        val line = Rect(0, y, g.width, 1)
-        g.fill(0, y, g.width, 1, Style.plain())
-        if confirming is Some(p)
-            g.text(0, y, s"Send TERM to ${p.pid} (${shortName(p.command)})? y/n", Style(Black, Red, Bold), line)
-            return
-        if editingFilter
-            g.text(0, y, s"Filter: $filter▏", Style(Black, Yellow, 0), line)
-            return
-        var x = 0
-        for (k, what) in footerKeys
-            x = g.text(x, y, k, Style.plain().with(Bold), line)
-            x = g.text(x, y, what, Style(Black, Cyan, 0), line)
-        val note = if message.nonEmpty then message else if filter.nonEmpty then s"filter: $filter" else ""
-        if note.nonEmpty && x + 1 < g.width
-            g.textIn(x + 1, y, g.width - x - 1, note, Style.fg(Yellow), 1, line)
+  // The bottom line: a kill's question, the filter being typed, or the keys and the last message.
+  private drawFooter(g: Grid, sample: Sample)
+    if g.height < 1 then return
+    val y = g.height - 1
+    val line = Rect(0, y, g.width, 1)
+    g.fill(0, y, g.width, 1, Style.plain())
+    if confirming is Some(p)
+      g.text(0, y, s"Send TERM to ${p.pid} (${shortName(p.command)})? y/n", Style(Black, Red, Bold), line)
+      return
+    if editingFilter
+      g.text(0, y, s"Filter: $filter▏", Style(Black, Yellow, 0), line)
+      return
+    var x = 0
+    for (k, what) in footerKeys
+      x = g.text(x, y, k, Style.plain().with(Bold), line)
+      x = g.text(x, y, what, Style(Black, Cyan, 0), line)
+    val note = if message.nonEmpty then message else if filter.nonEmpty then s"filter: $filter" else ""
+    if note.nonEmpty && x + 1 < g.width
+      g.textIn(x + 1, y, g.width - x - 1, note, Style.fg(Yellow), 1, line)
 
-    private drawHelp(g: Grid)
-        val lines = helpLines(sourceNote)
-        var widest = 0
-        for l in lines
-            if textWidth(l) > widest then widest = textWidth(l)
-        val w = minInt(widest + 4, g.width)
-        val h = minInt(lines.length + 2, g.height)
-        val r = Rect((g.width - w) / 2, (g.height - h) / 2, w, h)
-        g.fill(r.x, r.y, r.w, r.h, Style.plain())
-        g.box(r, Style.fg(Cyan), Rounded, "help — any key closes")
-        val inside = r.inset(1)
-        for (l, i) in lines.zipWithIndex
-            g.text(inside.x + 1, inside.y + i, l, Style.plain(), inside)
+  private drawHelp(g: Grid)
+    val lines = helpLines(sourceNote)
+    var widest = 0
+    for l in lines
+      if textWidth(l) > widest then widest = textWidth(l)
+    val w = minInt(widest + 4, g.width)
+    val h = minInt(lines.length + 2, g.height)
+    val r = Rect((g.width - w) / 2, (g.height - h) / 2, w, h)
+    g.fill(r.x, r.y, r.w, r.h, Style.plain())
+    g.box(r, Style.fg(Cyan), Rounded, "help — any key closes")
+    val inside = r.inset(1)
+    for (l, i) in lines.zipWithIndex
+      g.text(inside.x + 1, inside.y + i, l, Style.plain(), inside)
 
 // The keys the bottom line names, each with its word.
 val footerKeys: Vector[(string, string)] = [
-    ("F1", "Help   "), ("/", "Filter "), ("t", "Tree   "), ("P", "CPU%   "), ("M", "MEM%   "),
-    ("T", "TIME   "), ("N", "PID    "), ("k", "Kill   "), ("q", "Quit   ")
+  ("F1", "Help   "),
+  ("/", "Filter "),
+  ("t", "Tree   "),
+  ("P", "CPU%   "),
+  ("M", "MEM%   "),
+  ("T", "TIME   "),
+  ("N", "PID    "),
+  ("k", "Kill   "),
+  ("q", "Quit   ")
 ]
 
 // What the help shows.
 helpLines(sourceNote: string) -> Vector[string] = [
-    "Up, Down, PgUp, PgDn, Home, End   move the selection",
-    "P  M  T  N      sort by CPU%, MEM%, TIME+, PID",
-    "/  F3           filter by command; Enter keeps it, Esc clears it",
-    "t  F5           tree view by parent process",
-    "k  F9           send TERM to the selected process, after y",
-    "h  F1  ?        this help",
-    "q  F10          quit",
-    "",
-    "CPU% is of one processor, from processor time between two looks.",
-    s"Numbers from $sourceNote."
+  "Up, Down, PgUp, PgDn, Home, End   move the selection",
+  "P  M  T  N      sort by CPU%, MEM%, TIME+, PID",
+  "/  F3           filter by command; Enter keeps it, Esc clears it",
+  "t  F5           tree view by parent process",
+  "k  F9           send TERM to the selected process, after y",
+  "h  F1  ?        this help",
+  "q  F10          quit",
+  "",
+  "CPU% is of one processor, from processor time between two looks.",
+  s"Numbers from $sourceNote."
 ]
 
 // The last part of a path: the program's own name.
 shortName(command: string) -> string
-    val slash = command.lastIndexOf('/')
-    if slash < 0 then command else command.slice(slash + 1, command.byteLength)
+  val slash = command.lastIndexOf('/')
+  if slash < 0 then command else command.slice(slash + 1, command.byteLength)
 
 private minInt(a: int, b: int) -> int = if a < b then a else b

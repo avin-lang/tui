@@ -7,16 +7,16 @@ import dev.avinlang.top.CommandSource
 
 @test("on macOS a sample from the commands finds processes, processors, memory and this program")
 liveSample()
-    if process.os() != MacOS then return
-    val s = CommandSource().sample() match
-        Ok(s) -> s
-        Err(why) -> fail(why)
-    assert(s.cpus >= 1)
-    assert(s.cores.isEmpty)
-    assert(s.memory.total > 0)
-    assert(0 < s.memory.used <= s.memory.total)
-    assert(s.swap.used <= s.swap.total)
-    assert(0 < s.bootTime < s.now)
-    assert(s.procs.length > 1)
-    assert(s.procs.exists(p -> p.pid == process.pid()))
-    assert(s.procs.exists(p -> p.pid == 1))
+  if process.os() != MacOS then return
+  val s = CommandSource().sample() match
+    Ok(s) -> s
+    Err(why) -> fail(why)
+  assert(s.cpus >= 1)
+  assert(s.cores.isEmpty)
+  assert(s.memory.total > 0)
+  assert(0 < s.memory.used <= s.memory.total)
+  assert(s.swap.used <= s.swap.total)
+  assert(0 < s.bootTime < s.now)
+  assert(s.procs.length > 1)
+  assert(s.procs.exists(p -> p.pid == process.pid()))
+  assert(s.procs.exists(p -> p.pid == 1))

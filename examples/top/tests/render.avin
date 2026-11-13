@@ -9,190 +9,214 @@ rows(g: Grid) -> Vector[string] = Vector.tabulate(g.height, y -> g.rowText(y))
 
 // Two looks a second apart at three processes on four processors, 2 s used of 4 s.
 screen() -> (App, Sample, Usage)
-    val a = sample(0, [proc(1, ppid = 0, command = "/sbin/launchd", cpu = 0, user = 0),
-                       proc(50, command = "/usr/bin/zsh", cpu = 0, user = 0, rss = 4096),
-                       proc(77, ppid = 50, command = "/Applications/Some App.app/Contents/MacOS/Some App", cpu = 0, user = 0, rss = 512000)])
-    val b = sample(1000000, [proc(1, ppid = 0, command = "/sbin/launchd", cpu = 10, user = 5),
-                             proc(50, command = "/usr/bin/zsh", cpu = 40, user = 30, state = "R+", rss = 4096),
-                             proc(77, ppid = 50, command = "/Applications/Some App.app/Contents/MacOS/Some App", cpu = 150, user = 115, rss = 512000)])
-    val u = usage(Some(a), b)
-    val app = App("tests")
-    app.update(b, u)
-    (app, b, u)
+  val a = sample(
+    0,
+    [
+      proc(1, ppid = 0, command = "/sbin/launchd", cpu = 0, user = 0),
+      proc(50, command = "/usr/bin/zsh", cpu = 0, user = 0, rss = 4096),
+      proc(
+        77,
+        ppid = 50,
+        command = "/Applications/Some App.app/Contents/MacOS/Some App",
+        cpu = 0,
+        user = 0,
+        rss = 512000
+      )
+    ]
+  )
+  val b = sample(
+    1000000,
+    [
+      proc(1, ppid = 0, command = "/sbin/launchd", cpu = 10, user = 5),
+      proc(50, command = "/usr/bin/zsh", cpu = 40, user = 30, state = "R+", rss = 4096),
+      proc(
+        77,
+        ppid = 50,
+        command = "/Applications/Some App.app/Contents/MacOS/Some App",
+        cpu = 150,
+        user = 115,
+        rss = 512000
+      )
+    ]
+  )
+  val u = usage(Some(a), b)
+  val app = App("tests")
+  app.update(b, u)
+  (app, b, u)
 
 drawn(w: int, h: int) -> Grid
-    val (app, s, u) = screen()
-    val g = Grid(w, h)
-    app.draw(g, s, u)
-    g
+  val (app, s, u) = screen()
+  val g = Grid(w, h)
+  app.draw(g, s, u)
+  g
 
 @test("an 80 by 24 screen: meters, figures, headings, rows by CPU%, and the keys")
 screen80()
-    val r = rows(drawn(80, 24))
-    // 1.25 s in programs and 0.75 s in the system, of 4 s: 50%, in 17 of the bar's 34 cells.
-    assertEq(r(0), "CPU[|||||||||||||||||            50.0%]  Tasks: 3, 1 running                    ")
-    // 4G used, 1G compressed, 2G cached of 16G: 8, 10 and 14 cells of 32, the figure over the end.
-    assertEq(r(1), "Mem[|||||||||||||||         5.0G/16.0G]  Load average: 1.50 1.25 1.00           ")
-    assertEq(r(2), "Swp[|||||||||              512.0M/2.0G]  Uptime: 1 day, 01:01:02                ")
-    assertEq(r(3), " ".repeat(80))
-    assertEq(r(4), "    PID USER       CPU%  MEM%    RES     TIME+ COMMAND                          ")
-    assertEq(r(5), "     77 ed        150.0  51.2   500M   0:01.50 /Applications/Some App.app/Conte…")
-    assertEq(r(6), "     50 ed         40.0   0.4   4096   0:00.40 /usr/bin/zsh                     ")
-    assertEq(r(7), "      1 ed         10.0   0.1   1000   0:00.10 /sbin/launchd                    ")
-    assertEq(r(8), " ".repeat(80))
-    assertEq(r(23), "F1Help   /Filter tTree   PCPU%   MMEM%   TTIME   NPID    kKill   qQuit          ")
+  val r = rows(drawn(80, 24))
+  // 1.25 s in programs and 0.75 s in the system, of 4 s: 50%, in 17 of the bar's 34 cells.
+  assertEq(r(0), "CPU[|||||||||||||||||            50.0%]  Tasks: 3, 1 running                    ")
+  // 4G used, 1G compressed, 2G cached of 16G: 8, 10 and 14 cells of 32, the figure over the end.
+  assertEq(r(1), "Mem[|||||||||||||||         5.0G/16.0G]  Load average: 1.50 1.25 1.00           ")
+  assertEq(r(2), "Swp[|||||||||              512.0M/2.0G]  Uptime: 1 day, 01:01:02                ")
+  assertEq(r(3), " ".repeat(80))
+  assertEq(r(4), "    PID USER       CPU%  MEM%    RES     TIME+ COMMAND                          ")
+  assertEq(r(5), "     77 ed        150.0  51.2   500M   0:01.50 /Applications/Some App.app/Conte…")
+  assertEq(r(6), "     50 ed         40.0   0.4   4096   0:00.40 /usr/bin/zsh                     ")
+  assertEq(r(7), "      1 ed         10.0   0.1   1000   0:00.10 /sbin/launchd                    ")
+  assertEq(r(8), " ".repeat(80))
+  assertEq(r(23), "F1Help   /Filter tTree   PCPU%   MMEM%   TTIME   NPID    kKill   qQuit          ")
 
 @test("the selected row and the sorted column's heading are marked")
 marks()
-    val g = drawn(80, 24)
-    assert(g(0, 5).style.has(Reverse))
-    assert(!g(0, 6).style.has(Reverse))
-    // CPU% is the third column: PID 7 wide, USER 9, a blank between each.
-    assertEq(g(18, 4).style.bg, Cyan)
-    assertEq(g(10, 4).style.bg, Default)
+  val g = drawn(80, 24)
+  assert(g(0, 5).style.has(Reverse))
+  assert(!g(0, 6).style.has(Reverse))
+  // CPU% is the third column: PID 7 wide, USER 9, a blank between each.
+  assertEq(g(18, 4).style.bg, Cyan)
+  assertEq(g(10, 4).style.bg, Default)
 
 @test("the meters' parts are coloured: programs green, the system red")
 meterColours()
-    val g = drawn(80, 24)
-    // 1.5 s user and 0.5 s system of 4 s: 37.5% and 12.5% of 34 cells, 13 green then 4 red.
-    assertEq(g(4, 0).style.fg, Green)
-    assertEq(g(4 + 12, 0).style.fg, Green)
-    assertEq(g(4 + 13, 0).style.fg, Red)
-    assertEq(g(4 + 16, 0).style.fg, Red)
-    assertEq(g(4 + 17, 0).text, " ")
+  val g = drawn(80, 24)
+  // 1.5 s user and 0.5 s system of 4 s: 37.5% and 12.5% of 34 cells, 13 green then 4 red.
+  assertEq(g(4, 0).style.fg, Green)
+  assertEq(g(4 + 12, 0).style.fg, Green)
+  assertEq(g(4 + 13, 0).style.fg, Red)
+  assertEq(g(4 + 16, 0).style.fg, Red)
+  assertEq(g(4 + 17, 0).text, " ")
 
 @test("the tree view indents children under their parents")
 treeScreen()
-    val (app, s, u) = screen()
-    app.tree = true
-    app.update(s, u)
-    val g = Grid(80, 10)
-    app.draw(g, s, u)
-    val r = rows(g)
-    assertEq(r(5), "      1 ed         10.0   0.1   1000   0:00.10 /sbin/launchd                    ")
-    assertEq(r(6), "     50 ed         40.0   0.4   4096   0:00.40 └─ /usr/bin/zsh                  ")
-    assertEq(r(7), "     77 ed        150.0  51.2   500M   0:01.50    └─ /Applications/Some App.app…")
+  val (app, s, u) = screen()
+  app.tree = true
+  app.update(s, u)
+  val g = Grid(80, 10)
+  app.draw(g, s, u)
+  val r = rows(g)
+  assertEq(r(5), "      1 ed         10.0   0.1   1000   0:00.10 /sbin/launchd                    ")
+  assertEq(r(6), "     50 ed         40.0   0.4   4096   0:00.40 └─ /usr/bin/zsh                  ")
+  assertEq(r(7), "     77 ed        150.0  51.2   500M   0:01.50    └─ /Applications/Some App.app…")
 
 @test("a wide screen draws long commands whole")
 wide()
-    val r = rows(drawn(200, 60))
-    assert(r(5).contains("/Applications/Some App.app/Contents/MacOS/Some App"))
-    assertEq(textWidth(r(59)), 200)
+  val r = rows(drawn(200, 60))
+  assert(r(5).contains("/Applications/Some App.app/Contents/MacOS/Some App"))
+  assertEq(textWidth(r(59)), 200)
 
 @test("every size from nothing up draws without trapping, the keys on the last row")
 everySize()
-    for w in [0, 1, 2, 5, 10, 20, 39, 40, 41, 80, 133]
-        for h in [0, 1, 2, 3, 4, 5, 6, 10, 24]
-            val g = drawn(w, h)
-            assertEq(g.width, w)
-            if w >= 2 && h >= 1 then assert(g.rowText(h - 1).startsWith("F1".take(w)))
+  for w in [0, 1, 2, 5, 10, 20, 39, 40, 41, 80, 133]
+    for h in [0, 1, 2, 3, 4, 5, 6, 10, 24]
+      val g = drawn(w, h)
+      assertEq(g.width, w)
+      if w >= 2 && h >= 1 then assert(g.rowText(h - 1).startsWith("F1".take(w)))
 
 @test("a tiny screen shows what fits")
 tiny()
-    val r = rows(drawn(12, 4))
-    assertEq(r, ["CPU[]  Tasks", "Mem[]  Load ", "Swp[]  Uptim", "F1Help   /Fi"])
+  val r = rows(drawn(12, 4))
+  assertEq(r, ["CPU[]  Tasks", "Mem[]  Load ", "Swp[]  Uptim", "F1Help   /Fi"])
 
 @test("the bottom line asks before a kill, naming the program")
 footerKill()
-    val (app, s, u) = screen()
-    app.handle(KeyPress(Char('k'), 0))
-    val g = Grid(60, 12)
-    app.draw(g, s, u)
-    assertEq(g.rowText(11), "Send TERM to 77 (Some App)? y/n                             ")
+  val (app, s, u) = screen()
+  app.handle(KeyPress(Char('k'), 0))
+  val g = Grid(60, 12)
+  app.draw(g, s, u)
+  assertEq(g.rowText(11), "Send TERM to 77 (Some App)? y/n                             ")
 
 @test("the bottom line shows the filter being typed, then keeps it beside the keys")
 footerFilter()
-    val (app, s, u) = screen()
-    app.handle(KeyPress(Char('/'), 0))
-    app.handle(Paste("zsh"))
-    app.update(s, u)
-    val g = Grid(80, 12)
-    app.draw(g, s, u)
-    assertEq(g.rowText(11), "Filter: zsh▏" + " ".repeat(68))
-    assert(g.rowText(5).contains("/usr/bin/zsh"))
-    assert(g.rowText(6).isBlank)
-    app.handle(KeyPress(Enter, 0))
-    val h = Grid(100, 12)
-    app.draw(h, s, u)
-    assert(h.rowText(11).endsWith("filter: zsh"))
-    // Where the line has no room for it, it is cut rather than drawn over the keys.
-    val narrow = Grid(80, 12)
-    app.draw(narrow, s, u)
-    assertEq(narrow.rowText(11).takeRight(15), "qQuit    filte…")
+  val (app, s, u) = screen()
+  app.handle(KeyPress(Char('/'), 0))
+  app.handle(Paste("zsh"))
+  app.update(s, u)
+  val g = Grid(80, 12)
+  app.draw(g, s, u)
+  assertEq(g.rowText(11), "Filter: zsh▏" + " ".repeat(68))
+  assert(g.rowText(5).contains("/usr/bin/zsh"))
+  assert(g.rowText(6).isBlank)
+  app.handle(KeyPress(Enter, 0))
+  val h = Grid(100, 12)
+  app.draw(h, s, u)
+  assert(h.rowText(11).endsWith("filter: zsh"))
+  // Where the line has no room for it, it is cut rather than drawn over the keys.
+  val narrow = Grid(80, 12)
+  app.draw(narrow, s, u)
+  assertEq(narrow.rowText(11).takeRight(15), "qQuit    filte…")
 
 @test("the last message is shown at the right of the bottom line")
 footerMessage()
-    val (app, s, u) = screen()
-    app.message = "sent TERM to 77"
-    val g = Grid(100, 12)
-    app.draw(g, s, u)
-    assert(g.rowText(11).endsWith("sent TERM to 77"))
+  val (app, s, u) = screen()
+  app.message = "sent TERM to 77"
+  val g = Grid(100, 12)
+  app.draw(g, s, u)
+  assert(g.rowText(11).endsWith("sent TERM to 77"))
 
 @test("the help is drawn over the screen in a box, and says where the numbers come from")
 helpScreen()
-    val (app, s, u) = screen()
-    app.help = true
-    val g = Grid(100, 24)
-    app.draw(g, s, u)
-    val text = rows(g).mkString("\n")
-    assert(text.contains("help — any key closes"))
-    assert(text.contains("send TERM to the selected process"))
-    assert(text.contains("Numbers from tests."))
+  val (app, s, u) = screen()
+  app.help = true
+  val g = Grid(100, 24)
+  app.draw(g, s, u)
+  val text = rows(g).mkString("\n")
+  assert(text.contains("help — any key closes"))
+  assert(text.contains("send TERM to the selected process"))
+  assert(text.contains("Numbers from tests."))
 
 @test("the help on a screen smaller than it is cut, without trapping")
 helpSmall()
-    val (app, s, u) = screen()
-    app.help = true
-    for (w, h) in [(0, 0), (1, 1), (10, 4), (30, 8)]
-        app.draw(Grid(w, h), s, u)
+  val (app, s, u) = screen()
+  app.help = true
+  for (w, h) in [(0, 0), (1, 1), (10, 4), (30, 8)]
+    app.draw(Grid(w, h), s, u)
 
 @test("with each processor's ticks, a meter per processor, half on each side")
 perCoreHeader()
-    val a = sample(0, [], cores = [Ticks(0, 0, 0), Ticks(0, 0, 0), Ticks(0, 0, 0)])
-    val b = sample(1000000, [], cores = [Ticks(50, 0, 50), Ticks(0, 100, 0), Ticks(0, 0, 100)])
-    val u = usage(Some(a), b)
-    val g = Grid(60, 8)
-    // Two processors on the left, one on the right above the figures; labels as wide as `Mem`.
-    assertEq(drawHeader(g, b, u), 4)
-    val r = rows(g)
-    assertEq(r(0), "  0[||||||||||||       50.0%]    2[                    0.0%]")
-    assertEq(r(1), "  1[||||||||||||||||||100.0%]  Tasks: 0, 0 running          ")
-    assertEq(r(2), "Mem[|||||||||||   5.0G/16.0G]  Load average: 1.50 1.25 1.00 ")
-    assertEq(r(3), "Swp[||||||       512.0M/2.0G]  Uptime: 1 day, 01:01:02      ")
-    assertEq(g(4, 0).style.fg, Green)
-    assertEq(g(4, 1).style.fg, Red)
+  val a = sample(0, [], cores = [Ticks(0, 0, 0), Ticks(0, 0, 0), Ticks(0, 0, 0)])
+  val b = sample(1000000, [], cores = [Ticks(50, 0, 50), Ticks(0, 100, 0), Ticks(0, 0, 100)])
+  val u = usage(Some(a), b)
+  val g = Grid(60, 8)
+  // Two processors on the left, one on the right above the figures; labels as wide as `Mem`.
+  assertEq(drawHeader(g, b, u), 4)
+  val r = rows(g)
+  assertEq(r(0), "  0[||||||||||||       50.0%]    2[                    0.0%]")
+  assertEq(r(1), "  1[||||||||||||||||||100.0%]  Tasks: 0, 0 running          ")
+  assertEq(r(2), "Mem[|||||||||||   5.0G/16.0G]  Load average: 1.50 1.25 1.00 ")
+  assertEq(r(3), "Swp[||||||       512.0M/2.0G]  Uptime: 1 day, 01:01:02      ")
+  assertEq(g(4, 0).style.fg, Green)
+  assertEq(g(4, 1).style.fg, Red)
 
 @test("more processors than rows keep their labels aligned")
 manyCores()
-    val ticks = Vector.tabulate(12, _ -> Ticks(0, 0, 0))
-    val u = usage(None, sample(0, [], cores = ticks))
-    val g = Grid(60, 10)
-    assertEq(drawHeader(g, sample(0, [], cores = ticks), u), 9)
-    assertEq(g.rowText(0).take(5), "  0[ ")
-    assertEq(g.rowText(5).take(5), "  5[ ")
-    assertEq(g.rowText(6).take(4), "Mem[")
-    assertEq(g.rowText(0).drop(31).take(4), "  6[")
-    assertEq(g.rowText(5).drop(31).take(4), " 11[")
-    assert(g.rowText(6).drop(31).startsWith("Tasks: "))
+  val ticks = Vector.tabulate(12, _ -> Ticks(0, 0, 0))
+  val u = usage(None, sample(0, [], cores = ticks))
+  val g = Grid(60, 10)
+  assertEq(drawHeader(g, sample(0, [], cores = ticks), u), 9)
+  assertEq(g.rowText(0).take(5), "  0[ ")
+  assertEq(g.rowText(5).take(5), "  5[ ")
+  assertEq(g.rowText(6).take(4), "Mem[")
+  assertEq(g.rowText(0).drop(31).take(4), "  6[")
+  assertEq(g.rowText(5).drop(31).take(4), " 11[")
+  assert(g.rowText(6).drop(31).startsWith("Tasks: "))
 
 @test("a meter fills one cell in each per share, part after part, held to its width")
 meter()
-    val g = Grid(14, 1)
-    drawMeter(g, Rect(0, 0, 14, 1), 1, ("x", [(0.25, Green), (0.5, Red)], "ab"))
-    // 0.75 of 11 cells is 8; the figure ends at the bracket.
-    assertEq(g.rowText(0), "x[|||||||| ab]")
-    assertEq(g(2, 0).style.fg, Green)
-    assertEq(g(5, 0).style.fg, Red)
-    val over = Grid(8, 1)
-    drawMeter(over, Rect(0, 0, 8, 1), 1, ("x", [(0.9, Green), (0.9, Red), (-1.0, Red)], ""))
-    assertEq(over.rowText(0), "x[|||||]")
-    val narrow = Grid(3, 1)
-    drawMeter(narrow, Rect(0, 0, 3, 1), 1, ("x", [(1.0, Green)], "100%"))
-    assertEq(narrow.rowText(0), "x[]")
+  val g = Grid(14, 1)
+  drawMeter(g, Rect(0, 0, 14, 1), 1, ("x", [(0.25, Green), (0.5, Red)], "ab"))
+  // 0.75 of 11 cells is 8; the figure ends at the bracket.
+  assertEq(g.rowText(0), "x[|||||||| ab]")
+  assertEq(g(2, 0).style.fg, Green)
+  assertEq(g(5, 0).style.fg, Red)
+  val over = Grid(8, 1)
+  drawMeter(over, Rect(0, 0, 8, 1), 1, ("x", [(0.9, Green), (0.9, Red), (-1.0, Red)], ""))
+  assertEq(over.rowText(0), "x[|||||]")
+  val narrow = Grid(3, 1)
+  drawMeter(narrow, Rect(0, 0, 3, 1), 1, ("x", [(1.0, Green)], "100%"))
+  assertEq(narrow.rowText(0), "x[]")
 
 @test("a share of nothing is nothing")
 fractions()
-    assertEq(fraction(5, 0), 0.0)
-    assertEq(fraction(1, 4), 0.25)
-    val (_, _, figure) = cpuMeter("CPU", CpuShare(0.25, 0.125))
-    assertEq(figure, "37.5%")
+  assertEq(fraction(5, 0), 0.0)
+  assertEq(fraction(1, 4), 0.25)
+  val (_, _, figure) = cpuMeter("CPU", CpuShare(0.25, 0.125))
+  assertEq(figure, "37.5%")

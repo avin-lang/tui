@@ -20,20 +20,20 @@ import avin.time
 import dev.avinlang.tui.{Char, KeyPress, Options, Rect, Stop, Style, Terminal, Yellow}
 
 main() -> int = Terminal.use(Options(), run) match
-    Ok(()) -> 0
-    Err(e) ->
-        eprintln(e.message)
-        1
+  Ok(()) -> 0
+  Err(e) ->
+    eprintln(e.message)
+    1
 
 run(term: Terminal)
-    loop
-        val g = term.frame()
-        g.box(Rect(0, 0, g.width, g.height), Style.fg(Yellow), title = "press q")
-        term.present(g)
-        term.poll(time.seconds(1)) match
-            Some(KeyPress(Char('q'), _)) -> return
-            Some(Stop(_)) -> return
-            _ -> ()
+  loop
+    val g = term.frame()
+    g.box(Rect(0, 0, g.width, g.height), Style.fg(Yellow), title = "press q")
+    term.present(g)
+    term.poll(time.seconds(1)) match
+      Some(KeyPress(Char('q'), _)) -> return
+      Some(Stop(_)) -> return
+      _ -> ()
 ```
 
 Each frame is drawn into a fresh `Grid` the size of the terminal; `present` sends only the bytes

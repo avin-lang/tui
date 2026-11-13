@@ -6,8 +6,8 @@ module dev.avinlang.tui
 data Cell(text: string, style: Style)
 
 impl Cell
-    // Whether this is the right half of a two-column cluster.
-    isContinuation() -> bool = text.isEmpty
+  // Whether this is the right half of a two-column cluster.
+  isContinuation() -> bool = text.isEmpty
 
 // A blank cell in `style`.
 blankCell(style: Style) -> Cell = Cell(" ", style)
@@ -18,79 +18,79 @@ blankCell(style: Style) -> Cell = Cell(" ", style)
 // Writing over either half of one blanks the other half, so the grid never holds half a character,
 // and a two-column cluster that would end past the right edge is drawn as a blank instead.
 class Grid(val width: int, val height: int)
-    private val cells: Array[Cell] = Array.fill(checkedArea(width, height), blankCell(Style.plain()))
+  private val cells: Array[Cell] = Array.fill(checkedArea(width, height), blankCell(Style.plain()))
 
-    // The cell at column `x` of row `y`; traps outside the grid.
-    apply(x: int, y: int) -> Cell = cells(index(x, y))
+  // The cell at column `x` of row `y`; traps outside the grid.
+  apply(x: int, y: int) -> Cell = cells(index(x, y))
 
-    // Whether column `x` of row `y` is inside the grid.
-    contains(x: int, y: int) -> bool = 0 <= x < width && 0 <= y < height
+  // Whether column `x` of row `y` is inside the grid.
+  contains(x: int, y: int) -> bool = 0 <= x < width && 0 <= y < height
 
-    // Puts `cluster` at column `x` of row `y` in `style`, keeping the grid's rule, and answers the
-    // columns it took: 0 for a cluster of no width or a place outside the grid, which change nothing.
-    put(x: int, y: int, cluster: Cluster, style: Style) -> int
-        if !contains(x, y) || cluster.width <= 0 then return 0
-        if cluster.width == 2 && x + 1 >= width
-            set(x, y, blankCell(style))
-            return 1
-        set(x, y, Cell(cluster.text, style))
-        if cluster.width == 2
-            set(x + 1, y, Cell("", style))
-        cluster.width
+  // Puts `cluster` at column `x` of row `y` in `style`, keeping the grid's rule, and answers the
+  // columns it took: 0 for a cluster of no width or a place outside the grid, which change nothing.
+  put(x: int, y: int, cluster: Cluster, style: Style) -> int
+    if !contains(x, y) || cluster.width <= 0 then return 0
+    if cluster.width == 2 && x + 1 >= width
+      set(x, y, blankCell(style))
+      return 1
+    set(x, y, Cell(cluster.text, style))
+    if cluster.width == 2
+      set(x + 1, y, Cell("", style))
+    cluster.width
 
-    // Puts one character, as `put` does with its cluster.
-    putChar(x: int, y: int, c: char, style: Style) -> int =
-        put(x, y, Cluster(sanitize(c).toString(), charWidth(sanitize(c))), style)
+  // Puts one character, as `put` does with its cluster.
+  putChar(x: int, y: int, c: char, style: Style) -> int =
+    put(x, y, Cluster(sanitize(c).toString(), charWidth(sanitize(c))), style)
 
-    // Sets every cell to a blank in `style`.
-    clear(style: Style = Style.plain())
-        val blank = blankCell(style)
-        var i = 0
-        while i < cells.length
-            cells(i) = blank
-            i += 1
+  // Sets every cell to a blank in `style`.
+  clear(style: Style = Style.plain())
+    val blank = blankCell(style)
+    var i = 0
+    while i < cells.length
+      cells(i) = blank
+      i += 1
 
-    // Sets the cells of the rectangle, clipped to the grid, to blanks in `style`, keeping the rule at
-    // its edges.
-    fill(x: int, y: int, w: int, h: int, style: Style)
-        val blank = blankCell(style)
-        for row in maxOf(y, 0) ..< minOf(y + h, height)
-            for col in maxOf(x, 0) ..< minOf(x + w, width)
-                set(col, row, blank)
+  // Sets the cells of the rectangle, clipped to the grid, to blanks in `style`, keeping the rule at
+  // its edges.
+  fill(x: int, y: int, w: int, h: int, style: Style)
+    val blank = blankCell(style)
+    for row in maxOf(y, 0) ..< minOf(y + h, height)
+      for col in maxOf(x, 0) ..< minOf(x + w, width)
+        set(col, row, blank)
 
-    // A copy of this grid, cell for cell.
-    copy() -> Grid
-        val g = Grid(width, height)
-        var i = 0
-        while i < cells.length
-            g.cells(i) = cells(i)
-            i += 1
-        g
+  // A copy of this grid, cell for cell.
+  copy() -> Grid
+    val g = Grid(width, height)
+    var i = 0
+    while i < cells.length
+      g.cells(i) = cells(i)
+      i += 1
+    g
 
-    // The text of row `y`, each cluster once and continuations left out; for tests and logs.
-    rowText(y: int) -> string
-        val out = StringWriter()
-        for x in 0 ..< width
-            out.write(cells(index(x, y)).text)
-        out.text
+  // The text of row `y`, each cluster once and continuations left out; for tests and logs.
+  rowText(y: int) -> string
+    val out = StringWriter()
+    for x in 0 ..< width
+      out.write(cells(index(x, y)).text)
+    out.text
 
-    // Sets one cell, blanking the other half of any two-column cluster it cuts in two.
-    private set(x: int, y: int, cell: Cell)
-        val i = index(x, y)
-        val old = cells(i)
-        if old.isContinuation() && x > 0 && !cell.isContinuation()
-            cells(i - 1) = blankCell(cells(i - 1).style)
-        if !old.isContinuation() && x + 1 < width && cells(i + 1).isContinuation()
-            cells(i + 1) = blankCell(cells(i + 1).style)
-        cells(i) = cell
+  // Sets one cell, blanking the other half of any two-column cluster it cuts in two.
+  private set(x: int, y: int, cell: Cell)
+    val i = index(x, y)
+    val old = cells(i)
+    if old.isContinuation() && x > 0 && !cell.isContinuation()
+      cells(i - 1) = blankCell(cells(i - 1).style)
+    if !old.isContinuation() && x + 1 < width && cells(i + 1).isContinuation()
+      cells(i + 1) = blankCell(cells(i + 1).style)
+    cells(i) = cell
 
-    private index(x: int, y: int) -> int
-        if !contains(x, y) then fail(s"($x, $y) is outside a grid of $width by $height")
-        y * width + x
+  private index(x: int, y: int) -> int
+    if !contains(x, y) then fail(s"($x, $y) is outside a grid of $width by $height")
+    y * width + x
 
 private checkedArea(width: int, height: int) -> int
-    if width < 0 || height < 0 then fail(s"a grid of $width by $height: neither may be negative")
-    width * height
+  if width < 0 || height < 0 then fail(s"a grid of $width by $height: neither may be negative")
+  width * height
 
 private maxOf(a: int, b: int) -> int = if a > b then a else b
 private minOf(a: int, b: int) -> int = if a < b then a else b

@@ -16,152 +16,152 @@ module dev.avinlang.tui
 // lines of something longer, which has to be able to ask for more lines back than it has read yet.
 // The lines shown are held to the lines there are either way.
 class ScrollView()
-    // The first line shown, counted from 0.
-    var offset = 0
-    // Whether each draw scrolls to show the last line.
-    var follow = true
-    // The lines and the rows at the last draw.
-    var count = 0
-    var rows = 1
-    // Whether the view is anchored at the bottom, how many lines back from the end it is when it is,
-    // and the most lines back it may go (-1: the lines there are).
-    var fromEnd = false
-    var back = 0
-    var backLimit = -1
-    // The lines a page leaves in view from the one before it: 1 by default, 0 to page by the whole
-    // view.
-    var overlap = 1
-    // The bar drawn down the right edge while there are more lines than rows; it takes its column
-    // from the lines' width only then. `None`, the default, draws none.
-    var scrollbar: Option[Scrollbar] = None
+  // The first line shown, counted from 0.
+  var offset = 0
+  // Whether each draw scrolls to show the last line.
+  var follow = true
+  // The lines and the rows at the last draw.
+  var count = 0
+  var rows = 1
+  // Whether the view is anchored at the bottom, how many lines back from the end it is when it is,
+  // and the most lines back it may go (-1: the lines there are).
+  var fromEnd = false
+  var back = 0
+  var backLimit = -1
+  // The lines a page leaves in view from the one before it: 1 by default, 0 to page by the whole
+  // view.
+  var overlap = 1
+  // The bar drawn down the right edge while there are more lines than rows; it takes its column
+  // from the lines' width only then. `None`, the default, draws none.
+  var scrollbar: Option[Scrollbar] = None
 
-    // The largest offset, for `count` lines in `rows` rows.
-    maxOffset() -> int = maxOf(count - rows, 0)
+  // The largest offset, for `count` lines in `rows` rows.
+  maxOffset() -> int = maxOf(count - rows, 0)
 
-    // Whether the last line is shown.
-    atEnd() -> bool = offset >= maxOffset()
+  // Whether the last line is shown.
+  atEnd() -> bool = offset >= maxOffset()
 
-    // Scrolls `n` lines down, or up for a negative `n`, held to the lines there are.
-    scrollBy(n: int)
-        if fromEnd then backTo(back - n) else scrollTo(offset + n)
+  // Scrolls `n` lines down, or up for a negative `n`, held to the lines there are.
+  scrollBy(n: int)
+    if fromEnd then backTo(back - n) else scrollTo(offset + n)
 
-    // Puts line `i` at the top, held to the lines there are; following stops unless that shows the end.
-    scrollTo(i: int)
-        if fromEnd
-            backTo(maxOffset() - (if i < 0 then 0 else i))
-            return
-        offset = if i < 0 then 0 else if i > maxOffset() then maxOffset() else i
-        follow = atEnd()
+  // Puts line `i` at the top, held to the lines there are; following stops unless that shows the end.
+  scrollTo(i: int)
+    if fromEnd
+      backTo(maxOffset() - (if i < 0 then 0 else i))
+      return
+    offset = if i < 0 then 0 else if i > maxOffset() then maxOffset() else i
+    follow = atEnd()
 
-    // How many lines a page moves: the rows less `overlap`, at least one.
-    pageSize() -> int = maxOf(rows - maxOf(overlap, 0), 1)
+  // How many lines a page moves: the rows less `overlap`, at least one.
+  pageSize() -> int = maxOf(rows - maxOf(overlap, 0), 1)
 
-    lineUp() = scrollBy(-1)
-    lineDown() = scrollBy(1)
-    pageUp() = scrollBy(-pageSize())
-    pageDown() = scrollBy(pageSize())
+  lineUp() = scrollBy(-1)
+  lineDown() = scrollBy(1)
+  pageUp() = scrollBy(-pageSize())
+  pageDown() = scrollBy(pageSize())
 
-    // Shows the first line: the top, or with `fromEnd` as far back as it may go.
-    home()
-        if fromEnd then backTo(int.MaxValue) else scrollTo(0)
+  // Shows the first line: the top, or with `fromEnd` as far back as it may go.
+  home()
+    if fromEnd then backTo(int.MaxValue) else scrollTo(0)
 
-    // Shows the last line and follows the end from now on.
-    toEnd()
-        offset = maxOffset()
-        follow = true
-        back = 0
+  // Shows the last line and follows the end from now on.
+  toEnd()
+    offset = maxOffset()
+    follow = true
+    back = 0
 
-    // Sets `back` to `b`, held to 0 and the most it may be, and the offset to match.
-    private backTo(b: int)
-        val most = if backLimit >= 0 then backLimit else maxOffset()
-        back = if b < 0 then 0 else if b > most then most else b
-        offset = maxOf(count - rows - back, 0)
-        follow = back == 0
+  // Sets `back` to `b`, held to 0 and the most it may be, and the offset to match.
+  private backTo(b: int)
+    val most = if backLimit >= 0 then backLimit else maxOffset()
+    back = if b < 0 then 0 else if b > most then most else b
+    offset = maxOf(count - rows - back, 0)
+    follow = back == 0
 
-    // Moves for the keys a pager has: the arrows up and down by a line, Page Up and Page Down by a
-    // page (the rows less `overlap`), Home and End to the ends. Answers whether `k` was one of them.
-    handle(k: Key) -> bool
-        k match
-            Up -> lineUp()
-            Down -> lineDown()
-            PageUp -> pageUp()
-            PageDown -> pageDown()
-            Home -> home()
-            End -> toEnd()
-            _ -> return false
-        true
+  // Moves for the keys a pager has: the arrows up and down by a line, Page Up and Page Down by a
+  // page (the rows less `overlap`), Home and End to the ends. Answers whether `k` was one of them.
+  handle(k: Key) -> bool
+    k match
+      Up -> lineUp()
+      Down -> lineDown()
+      PageUp -> pageUp()
+      PageDown -> pageDown()
+      Home -> home()
+      End -> toEnd()
+      _ -> return false
+    true
 
-    // Takes the size of what is drawn, `count` lines in `rows` rows, and holds the position to it.
-    fit(lineCount: int, rowCount: int)
-        count = maxOf(lineCount, 0)
-        rows = maxOf(rowCount, 1)
-        if fromEnd
-            if back < 0 then back = 0
-            if backLimit < 0 && back > maxOffset() then back = maxOffset()
-            if backLimit >= 0 && back > backLimit then back = backLimit
-            offset = maxOf(count - rows - back, 0)
-            follow = back == 0
-            return
-        if follow || offset > maxOffset() then offset = maxOffset()
-        if offset < 0 then offset = 0
+  // Takes the size of what is drawn, `count` lines in `rows` rows, and holds the position to it.
+  fit(lineCount: int, rowCount: int)
+    count = maxOf(lineCount, 0)
+    rows = maxOf(rowCount, 1)
+    if fromEnd
+      if back < 0 then back = 0
+      if backLimit < 0 && back > maxOffset() then back = maxOffset()
+      if backLimit >= 0 && back > backLimit then back = backLimit
+      offset = maxOf(count - rows - back, 0)
+      follow = back == 0
+      return
+    if follow || offset > maxOffset() then offset = maxOffset()
+    if offset < 0 then offset = 0
 
-    // Draws the lines it shows of `lines` into `r` in `style`, one to a row, each cut at the right edge
-    // and the rows under the last line left blank.
-    draw(g: Grid, r: Rect, lines: Vector[string], style: Style = Style.plain())
-        if r.isEmpty() then return
-        fit(lines.length, r.h)
-        g.fill(r.x, r.y, r.w, r.h, style)
-        val body = drawBar(g, r)
-        for k in 0 ..< minOf(r.h, count - offset)
-            g.text(r.x, r.y + k, lines(offset + k), style, body)
+  // Draws the lines it shows of `lines` into `r` in `style`, one to a row, each cut at the right edge
+  // and the rows under the last line left blank.
+  draw(g: Grid, r: Rect, lines: Vector[string], style: Style = Style.plain())
+    if r.isEmpty() then return
+    fit(lines.length, r.h)
+    g.fill(r.x, r.y, r.w, r.h, style)
+    val body = drawBar(g, r)
+    for k in 0 ..< minOf(r.h, count - offset)
+      g.text(r.x, r.y + k, lines(offset + k), style, body)
 
-    // Draws the scrollbar down the right column of `r`, where there is one and the lines at the last
-    // `fit` do not fit, and answers what is left of `r` for the lines.
-    drawBar(g: Grid, r: Rect) -> Rect
-        val bar = if count > rows && r.w >= 2 then scrollbar else None
-        bar match
-            Some(b) -> g.scrollbar(Rect(r.right() - 1, r.y, 1, r.h), count, offset, rows, b)
-            None -> return r
-        Rect(r.x, r.y, r.w - 1, r.h)
+  // Draws the scrollbar down the right column of `r`, where there is one and the lines at the last
+  // `fit` do not fit, and answers what is left of `r` for the lines.
+  drawBar(g: Grid, r: Rect) -> Rect
+    val bar = if count > rows && r.w >= 2 then scrollbar else None
+    bar match
+      Some(b) -> g.scrollbar(Rect(r.right() - 1, r.y, 1, r.h), count, offset, rows, b)
+      None -> return r
+    Rect(r.x, r.y, r.w - 1, r.h)
 
 // A log: lines added at the end, at most `limit` of them kept, the oldest dropped first, shown in a
 // `ScrollView`. Text added is cut into lines at `\n`. While the view does not follow the end, lines
 // dropped from the start move it up with them, so the lines it shows stay in place.
 class LogView(val limit: int = 10000)
-    val view: ScrollView = ScrollView()
-    private val held: Deque[string] = Deque[string]()
+  val view: ScrollView = ScrollView()
+  private val held: Deque[string] = Deque[string]()
 
-    // The lines kept, oldest first.
-    lines() -> Vector[string] = held.toVector
+  // The lines kept, oldest first.
+  lines() -> Vector[string] = held.toVector
 
-    // How many lines are kept.
-    length() -> int = held.length
+  // How many lines are kept.
+  length() -> int = held.length
 
-    // Adds `text` as one line, or several where it holds `\n`.
-    append(text: string)
-        for line in text.split("\n")
-            held.append(line)
-        var dropped = 0
-        while held.length >maxOf(limit, 1)
-            held.removeHead()
-            dropped += 1
-        if dropped > 0 && !view.follow && !view.fromEnd then view.offset = maxOf(view.offset - dropped, 0)
+  // Adds `text` as one line, or several where it holds `\n`.
+  append(text: string)
+    for line in text.split("\n")
+      held.append(line)
+    var dropped = 0
+    while held.length > maxOf(limit, 1)
+      held.removeHead()
+      dropped += 1
+    if dropped > 0 && !view.follow && !view.fromEnd then view.offset = maxOf(view.offset - dropped, 0)
 
-    // Forgets every line and follows the end again.
-    clear()
-        held.clear()
-        view.offset = 0
-        view.follow = true
-        view.back = 0
+  // Forgets every line and follows the end again.
+  clear()
+    held.clear()
+    view.offset = 0
+    view.follow = true
+    view.back = 0
 
-    // Moves the view for a pager's keys, as `ScrollView.handle`.
-    handle(k: Key) -> bool = view.handle(k)
+  // Moves the view for a pager's keys, as `ScrollView.handle`.
+  handle(k: Key) -> bool = view.handle(k)
 
-    // Draws the view of the lines into `r`, as `ScrollView.draw` does, reading only the lines shown.
-    draw(g: Grid, r: Rect, style: Style = Style.plain())
-        if r.isEmpty() then return
-        view.fit(held.length, r.h)
-        g.fill(r.x, r.y, r.w, r.h, style)
-        val body = view.drawBar(g, r)
-        for k in 0 ..< minOf(r.h, held.length - view.offset)
-            g.text(r.x, r.y + k, held(view.offset + k), style, body)
+  // Draws the view of the lines into `r`, as `ScrollView.draw` does, reading only the lines shown.
+  draw(g: Grid, r: Rect, style: Style = Style.plain())
+    if r.isEmpty() then return
+    view.fit(held.length, r.h)
+    g.fill(r.x, r.y, r.w, r.h, style)
+    val body = view.drawBar(g, r)
+    for k in 0 ..< minOf(r.h, held.length - view.offset)
+      g.text(r.x, r.y + k, held(view.offset + k), style, body)

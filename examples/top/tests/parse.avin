@@ -2,8 +2,24 @@ module tests
 
 // The readers of what ps, sysctl and vm_stat print, from samples captured on a Mac and from the odd
 // lines a machine can produce.
-import dev.avinlang.top.{Load, Memory, Proc, Swap, VmStat, fields, parseBootTime, parseClock, parseLoad,
-                         parsePs, parsePsLine, parseSize, parseSwap, parseSysctl, parseVmStat, psFormat}
+import dev.avinlang.top.{
+  Load,
+  Memory,
+  Proc,
+  Swap,
+  VmStat,
+  fields,
+  parseBootTime,
+  parseClock,
+  parseLoad,
+  parsePs,
+  parsePsLine,
+  parseSize,
+  parseSwap,
+  parseSysctl,
+  parseVmStat,
+  psFormat
+}
 
 val psSample: string = """
     1     0 root               3.5  0.0  25584 198:16.39  75:33.10 Ss   /sbin/launchd
@@ -14,93 +30,93 @@ val psSample: string = """
 
 @test("the columns asked of ps end with the command, the one that may hold spaces")
 format()
-    assertEq(psFormat, "pid=,ppid=,user=,pcpu=,pmem=,rss=,time=,utime=,state=,comm=")
+  assertEq(psFormat, "pid=,ppid=,user=,pcpu=,pmem=,rss=,time=,utime=,state=,comm=")
 
 @test("each line of ps output is one process, its columns read in order")
 psLines()
-    val ps = parsePs(psSample)
-    assertEq(ps.length, 4)
-    assertEq(ps(0), Proc(1, 0, "root", 3.5, 0.0, 25584, 1189639, 453310, "Ss", "/sbin/launchd"))
-    assertEq(ps(1).pid, 110)
-    assertEq(ps(1).ppid, 108)
-    assertEq(ps(1).cpuTime, 47)
-    assertEq(ps(1).userTime, 45)
-    assert(ps(1).isRunning())
-    assert(!ps(1).isZombie())
+  val ps = parsePs(psSample)
+  assertEq(ps.length, 4)
+  assertEq(ps(0), Proc(1, 0, "root", 3.5, 0.0, 25584, 1189639, 453310, "Ss", "/sbin/launchd"))
+  assertEq(ps(1).pid, 110)
+  assertEq(ps(1).ppid, 108)
+  assertEq(ps(1).cpuTime, 47)
+  assertEq(ps(1).userTime, 45)
+  assert(ps(1).isRunning())
+  assert(!ps(1).isZombie())
 
 @test("a command with spaces keeps them")
 psSpaces()
-    val ps = parsePs(psSample)
-    assertEq(ps(2).command, "/Users/ed/Library/Application Support/JetBrains/Daemon/jetbrainsd")
-    assertEq(parsePsLine("1 0 u 0.0 0.0 1 0:00.00 0:00.00 S   a  b  c  ").get.command, "a  b  c")
+  val ps = parsePs(psSample)
+  assertEq(ps(2).command, "/Users/ed/Library/Application Support/JetBrains/Daemon/jetbrainsd")
+  assertEq(parsePsLine("1 0 u 0.0 0.0 1 0:00.00 0:00.00 S   a  b  c  ").get.command, "a  b  c")
 
 @test("a zombie has no memory and no time, and says so in its state")
 psZombie()
-    val z = parsePs(psSample)(3)
-    assert(z.isZombie())
-    assertEq(z.rssKb, 0)
-    assertEq(z.command, "<defunct>")
+  val z = parsePs(psSample)(3)
+  assert(z.isZombie())
+  assertEq(z.rssKb, 0)
+  assertEq(z.command, "<defunct>")
 
 @test("no output is no process, and blank lines are passed over")
 psEmpty()
-    assertEq(parsePs("").length, 0)
-    assertEq(parsePs("\n\n   \n").length, 0)
+  assertEq(parsePs("").length, 0)
+  assertEq(parsePs("\n\n   \n").length, 0)
 
 @test("a line missing columns, or with a column that is not a number, is passed over")
 psBadLines()
-    val text = "  12   1 ed 0.0 0.0 10 0:00.01 0:00.01\nx 1 ed 0.0 0.0 10 0:00.01 0:00.01 S cmd\n  13 1 ed 0.0 0.0 10 0:00.01 0:00.01 S ok\n 14 1 ed zero 0.0 10 0:00.01 0:00.01 S cmd\n 15 1 ed 0.0 0.0 10 1:2:3:4 0:00.01 S cmd"
-    val ps = parsePs(text)
-    assertEq(ps.length, 1)
-    assertEq(ps(0).pid, 13)
-    assertEq(ps(0).command, "ok")
+  val text = "  12   1 ed 0.0 0.0 10 0:00.01 0:00.01\nx 1 ed 0.0 0.0 10 0:00.01 0:00.01 S cmd\n  13 1 ed 0.0 0.0 10 0:00.01 0:00.01 S ok\n 14 1 ed zero 0.0 10 0:00.01 0:00.01 S cmd\n 15 1 ed 0.0 0.0 10 1:2:3:4 0:00.01 S cmd"
+  val ps = parsePs(text)
+  assertEq(ps.length, 1)
+  assertEq(ps(0).pid, 13)
+  assertEq(ps(0).command, "ok")
 
 @test("a command with an empty name is still a process")
 psNoCommand()
-    assertEq(parsePsLine("5 1 ed 0.0 0.0 10 0:00.00 0:00.00 S   ").get.command, "")
+  assertEq(parsePsLine("5 1 ed 0.0 0.0 10 0:00.00 0:00.00 S   ").get.command, "")
 
 @test("a user name beyond ASCII and a very long command are read whole")
 psUnicodeAndLong()
-    val long = "/x".repeat(2000)
-    val p = parsePsLine(s"  42  1 jürgen_日本 1.5 0.2 2048 0:01.50 0:01.00 S+ $long").get
-    assertEq(p.user, "jürgen_日本")
-    assertEq(p.command.byteLength, 4000)
-    assertEq(p.state, "S+")
-    assertEq(p.cpuTime, 150)
+  val long = "/x".repeat(2000)
+  val p = parsePsLine(s"  42  1 jürgen_日本 1.5 0.2 2048 0:01.50 0:01.00 S+ $long").get
+  assertEq(p.user, "jürgen_日本")
+  assertEq(p.command.byteLength, 4000)
+  assertEq(p.state, "S+")
+  assertEq(p.cpuTime, 150)
 
 @test("tabs separate columns as spaces do")
 psTabs()
-    assertEq(parsePsLine("7\t1\tu\t0.0\t0.0\t1\t0:00.00\t0:00.00\tS\tcmd").get.command, "cmd")
+  assertEq(parsePsLine("7\t1\tu\t0.0\t0.0\t1\t0:00.00\t0:00.00\tS\tcmd").get.command, "cmd")
 
 @test("fields answers the words asked for and the rest")
 fieldsSplit()
-    assertEq(fields("  a  b   c d ", 2), Some((["a", "b"], "c d")))
-    assertEq(fields("a b", 2), Some((["a", "b"], "")))
-    assertEq(fields("a", 2), None)
-    assertEq(fields("", 0), Some((Vector[string](), "")))
+  assertEq(fields("  a  b   c d ", 2), Some((["a", "b"], "c d")))
+  assertEq(fields("a b", 2), Some((["a", "b"], "")))
+  assertEq(fields("a", 2), None)
+  assertEq(fields("", 0), Some((Vector[string](), "")))
 
 @test("processor time: minutes and seconds with hundredths, any number of minutes")
 clockMinutes()
-    assertEq(parseClock("0:00.00"), Some(long(0)))
-    assertEq(parseClock("0:00.47"), Some(long(47)))
-    assertEq(parseClock("198:16.39"), Some(long(198 * 6000 + 1639)))
-    assertEq(parseClock("1:05"), Some(long(6500)))
-    assertEq(parseClock("0:01.5"), Some(long(150)))
-    assertEq(parseClock("0:01.567"), Some(long(156)))
+  assertEq(parseClock("0:00.00"), Some(long(0)))
+  assertEq(parseClock("0:00.47"), Some(long(47)))
+  assertEq(parseClock("198:16.39"), Some(long(198 * 6000 + 1639)))
+  assertEq(parseClock("1:05"), Some(long(6500)))
+  assertEq(parseClock("0:01.5"), Some(long(150)))
+  assertEq(parseClock("0:01.567"), Some(long(156)))
 
 @test("processor time: hours, and days before a dash")
 clockHoursDays()
-    assertEq(parseClock("01:02:03"), Some(long(((1 * 60 + 2) * 60 + 3) * 100)))
-    assertEq(parseClock("2-01:00:00"), Some(long(49) * 360000))
+  assertEq(parseClock("01:02:03"), Some(long(((1 * 60 + 2) * 60 + 3) * 100)))
+  assertEq(parseClock("2-01:00:00"), Some(long(49) * 360000))
 
 @test("processor time that is not one is None")
 clockBad()
-    assertEq(parseClock(""), None)
-    assertEq(parseClock("12"), None)
-    assertEq(parseClock("a:00.00"), None)
-    assertEq(parseClock("1:2:3:4"), None)
-    assertEq(parseClock("-1:00.00"), None)
-    assertEq(parseClock("0:-1.00"), None)
-    assertEq(parseClock("0:00.x"), None)
+  assertEq(parseClock(""), None)
+  assertEq(parseClock("12"), None)
+  assertEq(parseClock("a:00.00"), None)
+  assertEq(parseClock("1:2:3:4"), None)
+  assertEq(parseClock("-1:00.00"), None)
+  assertEq(parseClock("0:-1.00"), None)
+  assertEq(parseClock("0:00.x"), None)
 
 val sysctlSample: string = """
 hw.ncpu: 18
@@ -112,58 +128,58 @@ vm.swapusage: total = 4096.00M  used = 2390.75M  free = 1705.25M  (encrypted)
 
 @test("sysctl's values are read by name")
 sysctl()
-    val s = parseSysctl(sysctlSample).get
-    assertEq(s.cpus, 18)
-    assertEq(s.load, Load(40.45, 21.32, 16.67))
-    assertEq(s.bootTime, 1793409579)
-    assertEq(s.memory, 68719476736)
-    assertEq(s.swap, Swap(4096 * 1048576, long(2390.75 * 1048576.0 + 0.5)))
+  val s = parseSysctl(sysctlSample).get
+  assertEq(s.cpus, 18)
+  assertEq(s.load, Load(40.45, 21.32, 16.67))
+  assertEq(s.bootTime, 1793409579)
+  assertEq(s.memory, 68719476736)
+  assertEq(s.swap, Swap(4096 * 1048576, long(2390.75 * 1048576.0 + 0.5)))
 
 @test("sysctl's values in another order are read the same")
 sysctlOrder()
-    val lines = sysctlSample.lines
-    val reversed = lines.reverse.mkString("\n")
-    assertEq(parseSysctl(reversed), parseSysctl(sysctlSample))
+  val lines = sysctlSample.lines
+  val reversed = lines.reverse.mkString("\n")
+  assertEq(parseSysctl(reversed), parseSysctl(sysctlSample))
 
 @test("sysctl output missing a value, or with one unreadable, is None")
 sysctlMissing()
-    assertEq(parseSysctl(""), None)
-    assertEq(parseSysctl(sysctlSample.replace("hw.ncpu: 18", "")), None)
-    assertEq(parseSysctl(sysctlSample.replace("hw.ncpu: 18", "hw.ncpu: many")), None)
-    assertEq(parseSysctl(sysctlSample.replace("{ 40.45 21.32 16.67 }", "{ 40.45 }")), None)
+  assertEq(parseSysctl(""), None)
+  assertEq(parseSysctl(sysctlSample.replace("hw.ncpu: 18", "")), None)
+  assertEq(parseSysctl(sysctlSample.replace("hw.ncpu: 18", "hw.ncpu: many")), None)
+  assertEq(parseSysctl(sysctlSample.replace("{ 40.45 21.32 16.67 }", "{ 40.45 }")), None)
 
 @test("a machine with no swap has totals of zero")
 noSwap()
-    assertEq(parseSwap("total = 0.00M  used = 0.00M  free = 0.00M"), Some(Swap(0, 0)))
+  assertEq(parseSwap("total = 0.00M  used = 0.00M  free = 0.00M"), Some(Swap(0, 0)))
 
 @test("load averages are three numbers in braces")
 load()
-    assertEq(parseLoad("{ 1.52 1.61 1.70 }"), Some(Load(1.52, 1.61, 1.7)))
-    assertEq(parseLoad("{ 0.00 0.00 0.00 }"), Some(Load(0.0, 0.0, 0.0)))
-    assertEq(parseLoad("{ 1 2 }"), None)
-    assertEq(parseLoad("{ a b c }"), None)
+  assertEq(parseLoad("{ 1.52 1.61 1.70 }"), Some(Load(1.52, 1.61, 1.7)))
+  assertEq(parseLoad("{ 0.00 0.00 0.00 }"), Some(Load(0.0, 0.0, 0.0)))
+  assertEq(parseLoad("{ 1 2 }"), None)
+  assertEq(parseLoad("{ a b c }"), None)
 
 @test("the boot time is the seconds, the microseconds and the date after them dropped")
 bootTime()
-    assertEq(parseBootTime("{ sec = 1793409579, usec = 116790 } Fri Oct 30 21:19:39 2026"), Some(long(1793409579)))
-    assertEq(parseBootTime("{ sec = 0, usec = 0 }"), Some(long(0)))
-    assertEq(parseBootTime("{ usec = 5 }"), None)
-    assertEq(parseBootTime("{ sec = x }"), None)
-    assertEq(parseBootTime(""), None)
+  assertEq(parseBootTime("{ sec = 1793409579, usec = 116790 } Fri Oct 30 21:19:39 2026"), Some(long(1793409579)))
+  assertEq(parseBootTime("{ sec = 0, usec = 0 }"), Some(long(0)))
+  assertEq(parseBootTime("{ usec = 5 }"), None)
+  assertEq(parseBootTime("{ sec = x }"), None)
+  assertEq(parseBootTime(""), None)
 
 @test("sizes with and without a unit")
 sizes()
-    assertEq(parseSize("0"), Some(long(0)))
-    assertEq(parseSize("512"), Some(long(512)))
-    assertEq(parseSize("12B"), Some(long(12)))
-    assertEq(parseSize("1.5K"), Some(long(1536)))
-    assertEq(parseSize("4096.00M"), Some(long(4294967296)))
-    assertEq(parseSize("2G"), Some(long(2147483648)))
-    assertEq(parseSize("1T"), Some(long(1099511627776)))
-    assertEq(parseSize(""), None)
-    assertEq(parseSize("M"), None)
-    assertEq(parseSize("3X"), None)
-    assertEq(parseSize("-1M"), None)
+  assertEq(parseSize("0"), Some(long(0)))
+  assertEq(parseSize("512"), Some(long(512)))
+  assertEq(parseSize("12B"), Some(long(12)))
+  assertEq(parseSize("1.5K"), Some(long(1536)))
+  assertEq(parseSize("4096.00M"), Some(long(4294967296)))
+  assertEq(parseSize("2G"), Some(long(2147483648)))
+  assertEq(parseSize("1T"), Some(long(1099511627776)))
+  assertEq(parseSize(""), None)
+  assertEq(parseSize("M"), None)
+  assertEq(parseSize("3X"), None)
+  assertEq(parseSize("-1M"), None)
 
 val vmStatSample: string = """
 Mach Virtual Memory Statistics: (page size of 16384 bytes)
@@ -179,24 +195,26 @@ Swapins:                                      352950.
 
 @test("vm_stat's counts are read by name, its page size from its first line")
 vmStat()
-    val v = parseVmStat(vmStatSample).get
-    assertEq(v.pageSize, 16384)
-    assertEq(v.counts.get("Pages active"), Some(long(1328268)))
-    assertEq(v.counts.get("Translation faults"), Some(long(64125038936)))
-    assertEq(v.bytes("Pages wired down"), long(350011) * 16384)
-    assertEq(v.bytes("No such count"), 0)
+  val v = parseVmStat(vmStatSample).get
+  assertEq(v.pageSize, 16384)
+  assertEq(v.counts.get("Pages active"), Some(long(1328268)))
+  assertEq(v.counts.get("Translation faults"), Some(long(64125038936)))
+  assertEq(v.bytes("Pages wired down"), long(350011) * 16384)
+  assertEq(v.bytes("No such count"), 0)
 
 @test("memory from vm_stat: active and wired used, the compressor's, and inactive cached")
 memory()
-    val m = parseVmStat(vmStatSample).get.memory(68719476736)
-    assertEq(m, Memory(68719476736, long(1328268 + 350011) * 16384, long(315216) * 16384, long(1327873) * 16384))
+  val m = parseVmStat(vmStatSample).get.memory(68719476736)
+  assertEq(m, Memory(68719476736, long(1328268 + 350011) * 16384, long(315216) * 16384, long(1327873) * 16384))
 
 @test("vm_stat output without its header or page size is None; odd lines are passed over")
 vmStatBad()
-    assertEq(parseVmStat(""), None)
-    assertEq(parseVmStat("Pages free: 5."), None)
-    assertEq(parseVmStat("Mach Virtual Memory Statistics: (page size of x bytes)"), None)
-    assertEq(parseVmStat("Mach Virtual Memory Statistics: (page size of 0 bytes)"), None)
-    val v = parseVmStat("Mach Virtual Memory Statistics: (page size of 4096 bytes)\nno colon here\nPages odd: lots.\nPages free: 3.").get
-    assertEq(v.counts.size, 1)
-    assertEq(v.bytes("Pages free"), 12288)
+  assertEq(parseVmStat(""), None)
+  assertEq(parseVmStat("Pages free: 5."), None)
+  assertEq(parseVmStat("Mach Virtual Memory Statistics: (page size of x bytes)"), None)
+  assertEq(parseVmStat("Mach Virtual Memory Statistics: (page size of 0 bytes)"), None)
+  val v = parseVmStat(
+    "Mach Virtual Memory Statistics: (page size of 4096 bytes)\nno colon here\nPages odd: lots.\nPages free: 3."
+  ).get
+  assertEq(v.counts.size, 1)
+  assertEq(v.bytes("Pages free"), 12288)

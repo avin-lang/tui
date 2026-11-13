@@ -2,7 +2,12 @@ module dev.avinlang.tui
 
 // How a vertical scrollbar is drawn: its track in `trackCh` and `track`, its thumb in `thumbCh` and
 // `thumb`. A character not one column wide is drawn as `│` or `█`.
-data Scrollbar(track: Style = Style.fg(BrightBlack), thumb: Style = Style.plain(), trackCh: char = '│', thumbCh: char = '█')
+data Scrollbar(
+    track: Style = Style.fg(BrightBlack),
+    thumb: Style = Style.plain(),
+    trackCh: char = '│',
+    thumbCh: char = '█'
+)
 
 // Where the thumb of a scrollbar `height` cells high sits, as the first cell it covers and how many
 // it covers, for `total` items of which `shown` are visible from `first` on; (0, 0) where everything
@@ -14,29 +19,29 @@ data Scrollbar(track: Style = Style.fg(BrightBlack), thumb: Style = Style.plain(
 // there is more above and one away from the bottom that there is more below. Where the thumb has only
 // two places, it leaves the top only at the end.
 scrollThumb(height: int, total: int, first: int, shown: int) -> (int, int)
-    if height <= 0 || total <= 0 then return (0, 0)
-    val visible = if shown < 0 then 0 else shown
-    if total <= visible then return (0, 0)
-    val size = minOf(maxOf((height * visible * 2 + total) / (total * 2), 1), height)
-    val travel = height - size
-    val last = total - visible
-    if first <= 0 || travel == 0 then return (0, size)
-    if first >= last then return (travel, size)
-    if travel == 1 then return (0, size)
-    val at = (first * travel * 2 + last) / (last * 2)
-    (minOf(maxOf(at, 1), travel - 1), size)
+  if height <= 0 || total <= 0 then return (0, 0)
+  val visible = if shown < 0 then 0 else shown
+  if total <= visible then return (0, 0)
+  val size = minOf(maxOf((height * visible * 2 + total) / (total * 2), 1), height)
+  val travel = height - size
+  val last = total - visible
+  if first <= 0 || travel == 0 then return (0, size)
+  if first >= last then return (travel, size)
+  if travel == 1 then return (0, size)
+  val at = (first * travel * 2 + last) / (last * 2)
+  (minOf(maxOf(at, 1), travel - 1), size)
 
 impl Grid
-    // Draws a vertical scrollbar down the first column of `r`, `r.h` cells high, for `total` items of
-    // which `shown` are visible from `first` on: the track, and over it the thumb where `scrollThumb`
-    // places it. Where everything fits nothing is drawn.
-    scrollbar(r: Rect, total: int, first: int, shown: int, bar: Scrollbar = Scrollbar())
-        if r.isEmpty() then return
-        val (at, size) = scrollThumb(r.h, total, first, shown)
-        if size == 0 then return
-        val c = r.intersect(area())
-        val trackCh = oneColumn(bar.trackCh, '│')
-        val thumbCh = oneColumn(bar.thumbCh, '█')
-        for k in 0 ..< r.h
-            if at <= k < at + size then cell(r.x, r.y + k, thumbCh, bar.thumb, c)
-            else cell(r.x, r.y + k, trackCh, bar.track, c)
+  // Draws a vertical scrollbar down the first column of `r`, `r.h` cells high, for `total` items of
+  // which `shown` are visible from `first` on: the track, and over it the thumb where `scrollThumb`
+  // places it. Where everything fits nothing is drawn.
+  scrollbar(r: Rect, total: int, first: int, shown: int, bar: Scrollbar = Scrollbar())
+    if r.isEmpty() then return
+    val (at, size) = scrollThumb(r.h, total, first, shown)
+    if size == 0 then return
+    val c = r.intersect(area())
+    val trackCh = oneColumn(bar.trackCh, '│')
+    val thumbCh = oneColumn(bar.thumbCh, '█')
+    for k in 0 ..< r.h
+      if at <= k < at + size then cell(r.x, r.y + k, thumbCh, bar.thumb, c)
+      else cell(r.x, r.y + k, trackCh, bar.track, c)
