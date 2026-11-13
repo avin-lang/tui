@@ -50,23 +50,23 @@ main(args: Vector[string]) -> int
     table(out, "zeroWidthRanges", "Characters that take no column of their own.", minus(merged(zero), shown))
     table(out, "wideRanges", "Characters that take two columns: East Asian Wide and Fullwidth.", merged(wide))
     table(out, "emojiRanges", "Characters beyond ASCII with the Emoji property.", merged(pictures))
-    fs.writeText(args(1), out.text()) match
+    fs.writeText(args(1), out.text) match
         Ok(_) ->
             println(s"wrote ${args(1)} from Unicode $version")
             0
         Err(e) ->
-            eprintln(s"${args(1)}: ${e.message()}")
+            eprintln(s"${args(1)}: ${e.message}")
             1
 
 private readFile(file: string) -> string = fs.readText(file) match
     Ok(text) -> text
     Err(e) ->
-        eprintln(s"$file: ${e.message()}")
+        eprintln(s"$file: ${e.message}")
         process.exit(1)
 
 // The version a data file's first line names: `# EastAsianWidth-16.0.0.txt` is `16.0.0`.
 private versionOf(text: string) -> string
-    val first = text.lines()(0)
+    val first = text.lines(0)
     val dash = first.lastIndexOf("-")
     val dot = first.lastIndexOf(".txt")
     if dash < 0 || dot < dash then "unknown" else first.slice(dash + 1, dot)
@@ -74,25 +74,25 @@ private versionOf(text: string) -> string
 // The spans of every data line whose second field `keep` accepts.
 private spans(text: string, keep: (string) -> bool) -> Vector[Span]
     val found = Buffer[Span]()
-    for raw in text.lines()
+    for raw in text.lines
         val hash = raw.indexOf("#")
-        val line = (if hash >= 0 then raw.slice(0, hash) else raw).trim()
-        if line.isEmpty() then continue
+        val line = (if hash >= 0 then raw.slice(0, hash) else raw).trim
+        if line.isEmpty then continue
         val fields = line.split(";")
-        if fields.length < 2 || !keep(fields(1).trim()) then continue
-        val points = fields(0).trim()
+        if fields.length < 2 || !keep(fields(1).trim) then continue
+        val points = fields(0).trim
         val dots = points.indexOf("..")
         if dots < 0
             val p = hex(points)
             found.append(Span(p, p))
         else
-            found.append(Span(hex(points.slice(0, dots)), hex(points.slice(dots + 2, points.byteLength()))))
+            found.append(Span(hex(points.slice(0, dots)), hex(points.slice(dots + 2, points.byteLength))))
     found.toVector
 
 private hex(digits: string) -> int
     var n = 0
-    for c in digits.chars()
-        val d = c.asDigit()
+    for c in digits.chars
+        val d = c.asDigit
         if !(0 <= d < 16) then fail(s"not a hexadecimal code point: $digits")
         n = n * 16 + d
     n

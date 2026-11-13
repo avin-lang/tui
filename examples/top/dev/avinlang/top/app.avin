@@ -148,7 +148,7 @@ class App(val sourceNote: string)
 
     private askKill() -> Action
         confirming = selected()
-        if confirming.isEmpty() then message = "no process selected"
+        if confirming.isEmpty then message = "no process selected"
         Stay
 
     private move(n: int) -> Action
@@ -198,8 +198,8 @@ class App(val sourceNote: string)
         for (k, what) in footerKeys
             x = g.text(x, y, k, Style.plain().with(Bold), line)
             x = g.text(x, y, what, Style(Black, Cyan, 0), line)
-        val note = if message.nonEmpty() then message else if filter.nonEmpty() then s"filter: $filter" else ""
-        if note.nonEmpty() && x + 1 < g.width
+        val note = if message.nonEmpty then message else if filter.nonEmpty then s"filter: $filter" else ""
+        if note.nonEmpty && x + 1 < g.width
             g.textIn(x + 1, y, g.width - x - 1, note, Style.fg(Yellow), 1, line)
 
     private drawHelp(g: Grid)
@@ -239,6 +239,6 @@ helpLines(sourceNote: string) -> Vector[string] = [
 // The last part of a path: the program's own name.
 shortName(command: string) -> string
     val slash = command.lastIndexOf('/')
-    if slash < 0 then command else command.slice(slash + 1, command.byteLength())
+    if slash < 0 then command else command.slice(slash + 1, command.byteLength)
 
 private minInt(a: int, b: int) -> int = if a < b then a else b

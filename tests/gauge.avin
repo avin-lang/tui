@@ -150,7 +150,7 @@ gaugeEighthsInsideOneCell()
     for k in 1 ..< 9
         val h = Grid(1, 1)
         h.gauge(0, 0, 1, [Segment(real(k), cyan)], 8.0, rest = '·', eighths = true)
-        assertEq(h.rowText(0), blocks.chars()(k).toString())
+        assertEq(h.rowText(0), blocks.chars(k).toString())
     val e = Grid(1, 1)
     e.gauge(0, 0, 1, [Segment(0.0, cyan)], 8.0, eighths = true)
     assertEq(e.rowText(0), "·")

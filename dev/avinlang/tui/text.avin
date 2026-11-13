@@ -57,12 +57,12 @@ wrapChars(text: string, width: int) -> Vector[string]
         var used = 0
         for c in clusters(para)
             if used + c.width > width && used > 0
-                out.addOne(row.text())
+                out.addOne(row.text)
                 row = StringWriter()
                 used = 0
             row.write(c.text)
             used += c.width
-        out.addOne(row.text())
+        out.addOne(row.text)
     out.result()
 
 // The rows one line of text is broken into, filled a word at a time.
@@ -100,7 +100,7 @@ private class Wrapper(val width: int, val out: Builder[string, Vector[string]])
 
     // Ends this row and starts the next.
     newRow()
-        out.addOne(row.text())
+        out.addOne(row.text)
         row = StringWriter()
         used = 0
         hasWord = false
@@ -117,7 +117,7 @@ withEllipsis(text: string, width: int) -> string
         out.write(c.text)
         used += c.width
     out.write("…")
-    out.text()
+    out.text
 
 // A piece of text and the style it is drawn in; `None` takes the style of what it is drawn in, the
 // row of a table it is a cell of, say.
@@ -179,11 +179,11 @@ impl Grid
         var first = true
         for (key, what) in hints
             val before = if first then 0 else maxOf(gap, 0)
-            val w = textWidth(key) + (if what.isEmpty() then 0 else between + textWidth(what))
+            val w = textWidth(key) + (if what.isEmpty then 0 else between + textWidth(what))
             if !cut && col + before + w > c.right() then break
             col += before
             col = text(col, y, key, keyStyle, c)
-            if what.nonEmpty() then col = text(col + between, y, what, textStyle, c)
+            if what.nonEmpty then col = text(col + between, y, what, textStyle, c)
             first = false
         col
 

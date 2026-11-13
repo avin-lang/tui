@@ -21,7 +21,7 @@ ch(c: char, mods: int = 0) -> Event = KeyPress(Char(c), mods)
 // The events of `text` fed in two pieces, cut after every byte in turn, with `next` asked after each
 // piece and no flush until the end: what a sequence split between two reads gives.
 splitEverywhere(text: string) -> Vector[Vector[Event]]
-    val bytes = text.bytes()
+    val bytes = text.bytes
     val out = Vector.newBuilder[Vector[Event]]()
     for cut in 1 ..< bytes.length
         val d = Decoder()

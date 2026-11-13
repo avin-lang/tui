@@ -9,7 +9,7 @@ The module is `dev.avinlang.tui`.
 
 ```hocon
 dependencies {
-  tui { git = "github.com/avin-lang/tui", version = "0.2.4" }
+  tui { git = "github.com/avin-lang/tui", version = "0.2.5" }
 }
 ```
 
@@ -22,7 +22,7 @@ import dev.avinlang.tui.{Char, KeyPress, Options, Rect, Stop, Style, Terminal, Y
 main() -> int = Terminal.use(Options(), run) match
     Ok(()) -> 0
     Err(e) ->
-        eprintln(e.message())
+        eprintln(e.message)
         1
 
 run(term: Terminal)

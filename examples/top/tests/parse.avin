@@ -32,7 +32,7 @@ psLines()
 psSpaces()
     val ps = parsePs(psSample)
     assertEq(ps(2).command, "/Users/ed/Library/Application Support/JetBrains/Daemon/jetbrainsd")
-    assertEq(parsePsLine("1 0 u 0.0 0.0 1 0:00.00 0:00.00 S   a  b  c  ").get().command, "a  b  c")
+    assertEq(parsePsLine("1 0 u 0.0 0.0 1 0:00.00 0:00.00 S   a  b  c  ").get.command, "a  b  c")
 
 @test("a zombie has no memory and no time, and says so in its state")
 psZombie()
@@ -56,20 +56,20 @@ psBadLines()
 
 @test("a command with an empty name is still a process")
 psNoCommand()
-    assertEq(parsePsLine("5 1 ed 0.0 0.0 10 0:00.00 0:00.00 S   ").get().command, "")
+    assertEq(parsePsLine("5 1 ed 0.0 0.0 10 0:00.00 0:00.00 S   ").get.command, "")
 
 @test("a user name beyond ASCII and a very long command are read whole")
 psUnicodeAndLong()
     val long = "/x".repeat(2000)
-    val p = parsePsLine(s"  42  1 jürgen_日本 1.5 0.2 2048 0:01.50 0:01.00 S+ $long").get()
+    val p = parsePsLine(s"  42  1 jürgen_日本 1.5 0.2 2048 0:01.50 0:01.00 S+ $long").get
     assertEq(p.user, "jürgen_日本")
-    assertEq(p.command.byteLength(), 4000)
+    assertEq(p.command.byteLength, 4000)
     assertEq(p.state, "S+")
     assertEq(p.cpuTime, 150)
 
 @test("tabs separate columns as spaces do")
 psTabs()
-    assertEq(parsePsLine("7\t1\tu\t0.0\t0.0\t1\t0:00.00\t0:00.00\tS\tcmd").get().command, "cmd")
+    assertEq(parsePsLine("7\t1\tu\t0.0\t0.0\t1\t0:00.00\t0:00.00\tS\tcmd").get.command, "cmd")
 
 @test("fields answers the words asked for and the rest")
 fieldsSplit()
@@ -112,7 +112,7 @@ vm.swapusage: total = 4096.00M  used = 2390.75M  free = 1705.25M  (encrypted)
 
 @test("sysctl's values are read by name")
 sysctl()
-    val s = parseSysctl(sysctlSample).get()
+    val s = parseSysctl(sysctlSample).get
     assertEq(s.cpus, 18)
     assertEq(s.load, Load(40.45, 21.32, 16.67))
     assertEq(s.bootTime, 1793409579)
@@ -121,7 +121,7 @@ sysctl()
 
 @test("sysctl's values in another order are read the same")
 sysctlOrder()
-    val lines = sysctlSample.lines()
+    val lines = sysctlSample.lines
     val reversed = lines.reverse.mkString("\n")
     assertEq(parseSysctl(reversed), parseSysctl(sysctlSample))
 
@@ -179,7 +179,7 @@ Swapins:                                      352950.
 
 @test("vm_stat's counts are read by name, its page size from its first line")
 vmStat()
-    val v = parseVmStat(vmStatSample).get()
+    val v = parseVmStat(vmStatSample).get
     assertEq(v.pageSize, 16384)
     assertEq(v.counts.get("Pages active"), Some(long(1328268)))
     assertEq(v.counts.get("Translation faults"), Some(long(64125038936)))
@@ -188,7 +188,7 @@ vmStat()
 
 @test("memory from vm_stat: active and wired used, the compressor's, and inactive cached")
 memory()
-    val m = parseVmStat(vmStatSample).get().memory(68719476736)
+    val m = parseVmStat(vmStatSample).get.memory(68719476736)
     assertEq(m, Memory(68719476736, long(1328268 + 350011) * 16384, long(315216) * 16384, long(1327873) * 16384))
 
 @test("vm_stat output without its header or page size is None; odd lines are passed over")
@@ -197,6 +197,6 @@ vmStatBad()
     assertEq(parseVmStat("Pages free: 5."), None)
     assertEq(parseVmStat("Mach Virtual Memory Statistics: (page size of x bytes)"), None)
     assertEq(parseVmStat("Mach Virtual Memory Statistics: (page size of 0 bytes)"), None)
-    val v = parseVmStat("Mach Virtual Memory Statistics: (page size of 4096 bytes)\nno colon here\nPages odd: lots.\nPages free: 3.").get()
+    val v = parseVmStat("Mach Virtual Memory Statistics: (page size of 4096 bytes)\nno colon here\nPages odd: lots.\nPages free: 3.").get
     assertEq(v.counts.size, 1)
     assertEq(v.bytes("Pages free"), 12288)

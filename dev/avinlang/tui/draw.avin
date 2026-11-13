@@ -85,7 +85,7 @@ impl Grid
     box(r: Rect, style: Style = Style.plain(), border: Border = Single, title: string = "", clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue))
         if r.w < 2 || r.h < 2 then return
         val c = r.intersect(clip)
-        val chars = borderChars(border).chars()
+        val chars = borderChars(border).chars
         for col in r.x + 1 ..< r.right() - 1
             cell(col, r.y, chars(0), style, c)
             cell(col, r.bottom() - 1, chars(0), style, c)
@@ -96,7 +96,7 @@ impl Grid
         cell(r.right() - 1, r.y, chars(3), style, c)
         cell(r.right() - 1, r.bottom() - 1, chars(4), style, c)
         cell(r.x, r.bottom() - 1, chars(5), style, c)
-        if title.nonEmpty() && r.w > 4
+        if title.nonEmpty && r.w > 4
             text(r.x + 2, r.y, fitted(title, r.w - 4), style, Rect(r.x + 2, r.y, r.w - 4, 1).intersect(c))
 
     // Draws a horizontal bar `width` columns long from column `x`, filled to `fraction` (0 to 1, a
@@ -105,14 +105,14 @@ impl Grid
     meter(x: int, y: int, width: int, fraction: real, filled: Style, empty: Style = Style.plain(), clip: Rect = Rect(0, 0, int.MaxValue, int.MaxValue))
         if width <= 0 then return
         // A NaN is no comparison's answer, so it is held to 0 with the negatives.
-        val f = if fraction.isNaN() || fraction <= 0.0 then 0.0 else if fraction > 1.0 then 1.0 else fraction
+        val f = if fraction.isNaN || fraction <= 0.0 then 0.0 else if fraction > 1.0 then 1.0 else fraction
         val units = int(f * real(width * 8) + 0.5)
         val full = units / 8
         val part = units % 8
         val c = clip.intersect(area())
         val partial = Style(filled.fg, empty.bg, filled.attrs)
         for i in 0 ..< width
-            val ch = if i < full then '█' else if i == full && part > 0 then eighths.chars()(part) else ' '
+            val ch = if i < full then '█' else if i == full && part > 0 then eighths.chars(part) else ' '
             val s = if i < full then filled else if i == full && part > 0 then partial else empty
             cell(x + i, y, ch, s, c)
 
@@ -131,4 +131,4 @@ fitted(text: string, width: int) -> string
         out.write(c.text)
         used += c.width
     out.write("…")
-    out.text()
+    out.text

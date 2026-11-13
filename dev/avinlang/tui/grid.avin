@@ -7,7 +7,7 @@ data Cell(text: string, style: Style)
 
 impl Cell
     // Whether this is the right half of a two-column cluster.
-    isContinuation() -> bool = text.isEmpty()
+    isContinuation() -> bool = text.isEmpty
 
 // A blank cell in `style`.
 blankCell(style: Style) -> Cell = Cell(" ", style)
@@ -72,7 +72,7 @@ class Grid(val width: int, val height: int)
         val out = StringWriter()
         for x in 0 ..< width
             out.write(cells(index(x, y)).text)
-        out.text()
+        out.text
 
     // Sets one cell, blanking the other half of any two-column cluster it cuts in two.
     private set(x: int, y: int, cell: Cell)

@@ -8,7 +8,7 @@ import dev.avinlang.tui.{Bold, Char, Ctrl, Cyan, Event, Green, Grid, KeyPress, M
 main() -> int = Terminal.use(Options(mouse = true), run) match
     Ok(()) -> 0
     Err(e) ->
-        eprintln(s"hello: ${e.message()}")
+        eprintln(s"hello: ${e.message}")
         1
 
 // Draws a frame, then waits a quarter of a second for something to happen, until q.
@@ -32,7 +32,7 @@ remember(keys: Buffer[string], what: string)
 describe(e: Event) -> string
 describe(KeyPress(k, mods)) = s"key ${tui.keyName(k, mods)}"
 describe(Mouse(m)) = s"mouse ${m.action} button ${m.button} at ${m.x},${m.y}"
-describe(Paste(text)) = s"paste of ${text.charCount()} characters"
+describe(Paste(text)) = s"paste of ${text.charCount} characters"
 describe(Resize(cols, rows)) = s"resized to $cols x $rows"
 describe(Stop(sig)) = s"signal $sig"
 

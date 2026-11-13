@@ -12,5 +12,5 @@ main(args: Vector[string]) -> int = Terminal.open() match
                 term.close()
                 0
     Err(e) ->
-        println(e.message())
+        println(e.message)
         1

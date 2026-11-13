@@ -5,6 +5,7 @@ module dev.avinlang.tui
 // descriptor is a terminal, its size, raw mode on and off, waiting for input with a time limit, and
 // reading it.
 
+import avin.io
 import avin.io.IoError
 import avin.process
 import avin.process.ExitHook
@@ -91,7 +92,7 @@ private leaveSequence(o: Options) -> string
     if o.mouse then out.write("\u{1b}[?1006l\u{1b}[?1002l\u{1b}[?1000l")
     if o.paste then out.write("\u{1b}[?2004l")
     out.write("\u{1b}[0m\u{1b}[?25h\u{1b}[?1049l")
-    out.text()
+    out.text
 
 // What a terminal is set into on the way in: the alternate screen, cleared, the cursor hidden, and
 // the mouse and bracketed paste where asked for.
@@ -100,13 +101,13 @@ private enterSequence(o: Options) -> string
     out.write("\u{1b}[?1049h\u{1b}[?25l")
     if o.paste then out.write("\u{1b}[?2004h")
     if o.mouse then out.write("\u{1b}[?1000h\u{1b}[?1002h\u{1b}[?1006h")
-    out.text()
+    out.text
 
 // The colours a terminal shows, as its environment says: `COLORTERM` of `truecolor` or `24bit` is any
 // colour, a `TERM` naming `256color` is the palette, and anything else the sixteen. `NO_COLOR` does
 // not change it: a full-screen program's colours are part of what it draws.
 detectColorMode(colorTerm: Option[string], term: Option[string]) -> ColorMode
-    val ct = colorTerm.getOrElse("").toLowerCase()
+    val ct = colorTerm.getOrElse("").toLowerCase
     if ct == "truecolor" || ct == "24bit" then return TrueColor
     if term.getOrElse("").contains("256color") then Palette256 else Basic16
 
@@ -147,7 +148,7 @@ class Terminal(val options: Options, val colorMode: ColorMode, private val hook:
     // Draws `g` by difference from the last frame, in one write.
     present(g: Grid) -> Result[unit, IoError]
         val bytes = renderer.render(g)
-        if bytes.isEmpty() then return Ok(())
+        if bytes.isEmpty then return Ok(())
         print(bytes)
         flush()
         Ok(())
@@ -217,9 +218,9 @@ object Terminal
     // terminal. An exit hook puts the terminal back if the program ends, by `exit` or a trap, with it
     // open.
     open(options: Options = Options()) -> Result[Terminal, IoError]
-        if !isTerminal(InputFd) then return Err(IoError.Other("standard input is not a terminal"))
-        if !isTerminal(OutputFd) then return Err(IoError.Other("standard output is not a terminal"))
-        if !enterRaw() then return Err(IoError.Other("the terminal cannot be put into raw mode"))
+        if !isTerminal(InputFd) then return Err(IoError(io.Other("not a terminal"), "open the terminal on", "standard input"))
+        if !isTerminal(OutputFd) then return Err(IoError(io.Other("not a terminal"), "open the terminal on", "standard output"))
+        if !enterRaw() then return Err(IoError(io.Other("cannot be put into raw mode"), "open the terminal on", "standard input"))
         val mode = options.colors.getOrElse(detectColorMode(process.env("COLORTERM"), process.env("TERM")))
         val leave = leaveSequence(options)
         val hook = process.onExit(() -> restoreScreen(leave))
@@ -241,7 +242,7 @@ object Terminal
 // A watch of `sig`, which every platform this runs on has.
 private watchOrFail(sig: int) -> Watch = signal.watch(sig) match
     Ok(w) -> w
-    Err(e) -> fail(s"watching signal $sig: ${e.message()}")
+    Err(e) -> fail(s"watching signal $sig: ${e.message}")
 
 // What the exit hook does: the leave sequence, then the terminal's mode. It holds only the sequence,
 // so it can run on any thread.

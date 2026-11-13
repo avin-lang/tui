@@ -13,7 +13,7 @@ sgr(from: Style, to: Style, mode: ColorMode) -> string
     if a == b then return ""
     val changes = changeParams(a, b)
     val reset = resetParams(b)
-    Csi + (if reset.byteLength() < changes.byteLength() then reset else changes) + "m"
+    Csi + (if reset.byteLength < changes.byteLength then reset else changes) + "m"
 
 // The parameters that set `to` from scratch, after a reset.
 private resetParams(to: Style) -> string
@@ -68,7 +68,7 @@ private joined(p: Buffer[string]) -> string
         if !first then out.write(";")
         out.write(s)
         first = false
-    out.text()
+    out.text
 
 // The shortest sequence that moves the cursor from column `fromX` of row `fromY` to column `x` of
 // row `y`; `fromX` of -1 is a position the terminal does not know for certain. Columns and rows are
@@ -83,7 +83,7 @@ cursorMove(fromX: int, fromY: int, x: int, y: int) -> string
     val n = if x > fromX then x - fromX else fromX - x
     val code = if x > fromX then "C" else "D"
     val relative = if n == 1 then Csi + code else Csi + s"$n$code"
-    if relative.byteLength() < absolute.byteLength() then relative else absolute
+    if relative.byteLength < absolute.byteLength then relative else absolute
 
 // Draws grids on a terminal by difference: each frame is turned into the bytes that change what the
 // terminal shows into the new grid, and nothing else. It remembers what the terminal shows, where its
@@ -134,21 +134,21 @@ class Renderer(val mode: ColorMode)
             out.write(Csi + "0m")
             current = Style.plain()
         front = Some(next.copy())
-        out.text()
+        out.text
 
     // The bytes that bring the cursor to `x`, `y`: a cursor movement, or, where it is shorter, the
     // cells between the cursor and `x` written again, when they are in the current style and one
     // column each.
     private moveTo(next: Grid, x: int, y: int) -> string
         val move = cursorMove(cursorX, cursorY, x, y)
-        if move.isEmpty() || cursorY != y || cursorX < 0 || cursorX > x then return move
+        if move.isEmpty || cursorY != y || cursorX < 0 || cursorX > x then return move
         val again = StringWriter()
         var bytes = 0
         for col in cursorX ..< x
             val c = next(col, y)
             if c.style != current || c.isContinuation() || (col + 1 < next.width && next(col + 1, y).isContinuation())
                 return move
-            bytes += c.text.byteLength()
-            if bytes >= move.byteLength() then return move
+            bytes += c.text.byteLength
+            if bytes >= move.byteLength then return move
             again.write(c.text)
-        again.text()
+        again.text

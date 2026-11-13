@@ -36,7 +36,7 @@ keyName(k: Key, mods: int) -> string
     if (mods & Alt) != 0 then out.write("Alt-")
     if (mods & Shift) != 0 then out.write("Shift-")
     out.write(baseName(k))
-    out.text()
+    out.text
 
 private baseName(k: Key) -> string
 baseName(Char(' ')) = "Space"
@@ -107,7 +107,7 @@ class Decoder()
 
     // Adds the bytes of `text`; for tests.
     feedText(text: string)
-        pending.appendAll(text.bytes())
+        pending.appendAll(text.bytes)
 
     // Whether bytes are waiting that do not yet make an event.
     hasPending() -> bool = length() > 0 || pasting
@@ -168,7 +168,7 @@ class Decoder()
 
     // Collects pasted bytes until the sequence that ends the paste.
     private pasteStep() -> Option[Event]
-        val end = "\u{1b}[201~".bytes()
+        val end = "\u{1b}[201~".bytes
         while length() > 0
             paste.append(pending(start))
             drop(1)
@@ -280,7 +280,7 @@ class Decoder()
         val paramText = StringWriter()
         for k in i + 2 ..< j
             paramText.write(char(at(k)).toString())
-        val text = paramText.text()
+        val text = paramText.text
         if text.startsWith("<") then return mouse(text.drop(1), char(fin), used)
         val params = numbers(text)
         val mods = modifiers(params)
@@ -362,10 +362,10 @@ private modifiers(params: Vector[int]) -> int =
 // number ends them.
 private numbers(text: string) -> Vector[int]
     val out = Vector.newBuilder[int]()
-    if text.isEmpty() then return out.result()
+    if text.isEmpty then return out.result()
     for part in text.split(";")
         var n = 0
-        for c in part.chars()
+        for c in part.chars
             if !('0' <= c <= '9') then return out.result()
             n = n *| 10 +| (int(c) - int('0'))
         out.addOne(n)

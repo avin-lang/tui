@@ -14,7 +14,7 @@ module dev.avinlang.tui
 //   drawn as U+FFFD, which takes one column.
 
 // The character a cell shows for `c`: U+FFFD for a control character, `c` itself otherwise.
-sanitize(c: char) -> char = if c.isControl() then '\u{fffd}' else c
+sanitize(c: char) -> char = if c.isControl then '\u{fffd}' else c
 
 // The columns `c` takes when drawn on its own.
 charWidth(c: char) -> int
@@ -59,14 +59,14 @@ private isRegionalIndicator(c: char) -> bool = '\u{1f1e6}' <= c <= '\u{1f1ff}'
 // start or after a control character, are dropped.
 clusters(text: string) -> Vector[Cluster]
     val out = Vector.newBuilder[Cluster]()
-    val cs = text.chars()
+    val cs = text.chars
     val n = cs.length
     var i = 0
     while i < n && isZeroWidth(cs(i))
         i += 1
     while i < n
         val base = cs(i)
-        if base.isControl()
+        if base.isControl
             out.addOne(Cluster("\u{fffd}", 1))
             i += 1
             while i < n && isZeroWidth(cs(i))
@@ -85,10 +85,10 @@ clusters(text: string) -> Vector[Cluster]
             b.write(c.toString())
             i += 1
             if c == Vs16 && width == 1 && isEmojiBase(base) then width = 2
-            if c == Zwj && i < n && !cs(i).isControl()
+            if c == Zwj && i < n && !cs(i).isControl
                 b.write(cs(i).toString())
                 i += 1
-        out.addOne(Cluster(b.text(), width))
+        out.addOne(Cluster(b.text, width))
     out.result()
 
 // The columns `text` takes, cluster by cluster.

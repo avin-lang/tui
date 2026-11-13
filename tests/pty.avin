@@ -17,7 +17,7 @@ private ptyRun(arg: string) -> string
     val compiler = process.env("AVIN_COMPILER").getOrElse("avin")
     val source = process.currentDir().getOrElse("") + "/testdata/ptyprobe"
     val built = Command(compiler, "build", source, "-o", dir + "/probe").output()
-    assert(built.isOk(), "building the probe failed")
+    assert(built.isOk, "building the probe failed")
     val script = "(sleep 1) | script -q /dev/null sh -c '\"$PROBE\" $ARG; echo STATUS=$?; stty -a'"
     val shown = Command("sh", "-c", script).withEnv("PROBE", dir + "/probe").withEnv("ARG", arg).output()
     fs.removeDirAll(dir)
@@ -51,10 +51,10 @@ redirectedRefused()
     val dir = fs.createTempDir("tui-pty-").getOrElse("")
     val compiler = process.env("AVIN_COMPILER").getOrElse("avin")
     val source = process.currentDir().getOrElse("") + "/testdata/ptyprobe"
-    assert(Command(compiler, "build", source, "-o", dir + "/probe").output().isOk(), "building the probe")
+    assert(Command(compiler, "build", source, "-o", dir + "/probe").output().isOk, "building the probe")
     val shown = Command("sh", "-c", "(sleep 1) | script -q /dev/null sh -c '\"$PROBE\" close > \"$OUT\"; echo STATUS=$?'").withEnv("PROBE", dir + "/probe").withEnv("OUT", dir + "/out.txt").output().getOrElse("")
     val written = fs.readText(dir + "/out.txt").getOrElse("")
     fs.removeDirAll(dir)
     assert(shown.contains("STATUS=1"), "refused")
-    assert(written.contains("standard output is not a terminal"), "the reason")
+    assert(written.contains("cannot open the terminal on standard output: not a terminal"), "the reason")
     assert(!written.contains("\u{1b}"), "no escape sequence reached the file")

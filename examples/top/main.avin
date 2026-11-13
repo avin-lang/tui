@@ -10,7 +10,7 @@ import dev.avinlang.tui.{Options, Terminal}
 main() -> int = Terminal.use(Options(mouse = true), run) match
     Ok(()) -> 0
     Err(e) ->
-        eprintln(s"top: ${e.message()}")
+        eprintln(s"top: ${e.message}")
         1
 
 // How long between two looks at the system.
@@ -32,7 +32,7 @@ run(term: Terminal)
                 Ok(s) ->
                     val u = usage(before, s)
                     app.update(s, u)
-                    due = time.monotonic() + (if before.isEmpty() then first else every)
+                    due = time.monotonic() + (if before.isEmpty then first else every)
                     before = Some(s)
                     current = Some((s, u))
                 Err(why) ->
@@ -41,7 +41,7 @@ run(term: Terminal)
         val g = term.frame()
         current match
             Some((s, u)) -> app.draw(g, s, u)
-            None -> g.text(0, 0, if app.message.nonEmpty() then app.message else "looking…")
+            None -> g.text(0, 0, if app.message.nonEmpty then app.message else "looking…")
         term.present(g)
         val wait = due - time.monotonic()
         term.poll(if wait > time.millis(0) then wait else time.millis(0)) match
@@ -50,7 +50,7 @@ run(term: Terminal)
                 Kill(pid) ->
                     app.message = process.signal(pid, signal.Terminate) match
                         Ok(()) -> s"sent TERM to $pid"
-                        Err(e) -> s"$pid: ${e.message()}"
+                        Err(e) -> s"$pid: ${e.message}"
                     due = time.monotonic()
                 Stay -> current match
                     Some((s, u)) -> app.update(s, u)

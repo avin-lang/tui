@@ -22,7 +22,7 @@ app() -> App
 
 shownPids(a: App) -> string = a.shown.map(r -> r.proc.pid).mkString(" ")
 
-selectedPid(a: App) -> long = a.selected().get().pid
+selectedPid(a: App) -> long = a.selected().get.pid
 
 @test("rows are sorted by CPU% at first, and P M T N sort by each column")
 sortKeys()

@@ -15,7 +15,7 @@ quitsOnQ()
     val compiler = process.env("AVIN_COMPILER").getOrElse("avin")
     val here = process.currentDir().getOrElse("")
     val source = if fs.exists(here + "/main.avin") then here else here + "/examples/top"
-    assert(Command(compiler, "build", source, "-o", dir + "/top").output().isOk(), "building top")
+    assert(Command(compiler, "build", source, "-o", dir + "/top").output().isOk, "building top")
     val script = "(sleep 3; printf q; sleep 1) | script -q /dev/null sh -c '\"$TOP\"; echo STATUS=$?; stty -a'"
     val shown = Command("sh", "-c", script).withEnv("TOP", dir + "/top").output().getOrElse("")
     fs.removeDirAll(dir)

@@ -40,7 +40,7 @@ private steps(ends: Vector[int]) -> Vector[int]
 // before the quotient, so an amount that falls on an exact half of a unit is not pushed under it by
 // the rounding of `sum / budget`.
 private unitsAt(sum: real, budget: real, units: int) -> int
-    if budget.isNaN() || budget <= 0.0 || sum <= 0.0 then return 0
+    if budget.isNaN || budget <= 0.0 || sum <= 0.0 then return 0
     if sum >= budget then return units
     int(sum * real(units) / budget + 0.5)
 
@@ -84,7 +84,7 @@ impl Grid
                     val s = segments(j)
                     val covered = ends(j) - start
                     if covered >= 8 then cell(left + i, y, oneColumn(s.ch, '█'), s.style, c)
-                    else cell(left + i, y, gaugeBlocks.chars()(covered), Style(s.style.fg, empty.bg, s.style.attrs), c)
+                    else cell(left + i, y, gaugeBlocks.chars(covered), Style(s.style.fg, empty.bg, s.style.attrs), c)
             return x + width
         var col = left
         for (s, n) in segments.zip(gaugeCells(inner, segments, budget))
@@ -98,4 +98,4 @@ impl Grid
         x + width
 
 // `ch` where it is one column wide and not a control character, and `instead` where it is not.
-private oneColumn(ch: char, instead: char) -> char = if charWidth(ch) == 1 && !ch.isControl() then ch else instead
+private oneColumn(ch: char, instead: char) -> char = if charWidth(ch) == 1 && !ch.isControl then ch else instead
