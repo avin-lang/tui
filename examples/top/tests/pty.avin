@@ -18,7 +18,7 @@ quitsOnQ()
   assert(Command(compiler, "build", source, "-o", dir + "/top").output().isOk, "building top")
   val script = "(sleep 3; printf q; sleep 1) | script -q /dev/null sh -c '\"$TOP\"; echo STATUS=$?; stty -a'"
   val shown = Command("sh", "-c", script).withEnv("TOP", dir + "/top").output().getOrElse("")
-  fs.removeDirAll(dir)
+  val _ = fs.removeDirAll(dir) // a temp directory that cannot be removed is no failure of the test
   assert(shown.contains("\u{1b}[?1049h"), "it drew on the alternate screen")
   assert(shown.contains("STATUS=0"), "it ended with status 0")
   assert(shown.lastIndexOf("\u{1b}[?1049l") > shown.indexOf("\u{1b}[?1049h"), "it left the alternate screen")

@@ -1,13 +1,14 @@
 // A simplified htop: a meter for the processors, memory and swap, the load, the uptime, and every
 // process in a table that sorts, filters, shows the tree of parents and children, and sends a
 // process TERM. Press h for the keys, q to quit.
+import avin.io.IoError
 import avin.process
 import avin.signal
 import avin.time
 import dev.avinlang.top.{App, CommandSource, Kill, Quit, Sample, Source, Stay, Usage, usage}
 import dev.avinlang.tui.{Options, Terminal}
 
-main() -> int = Terminal.use(Options(mouse = true), run) match
+main() -> int = Terminal.use(Options(mouse = true), run).flatMap(r -> r) match
   Ok(()) -> 0
   Err(e) ->
     eprintln(s"top: ${e.message}")
@@ -19,8 +20,9 @@ val every: time.Duration = time.millis(1500)
 // The first look is compared with one taken this soon after, so the processors' use shows at once.
 val first: time.Duration = time.millis(300)
 
-// Looks at the system, draws, and waits for a key or the next look, until q.
-run(term: Terminal)
+// Looks at the system, draws, and waits for a key or the next look, until q. A frame that cannot be
+// written ends it with the error.
+run(term: Terminal) -> Result[unit, IoError]
   val source: Source = CommandSource()
   val app = App(source.describe())
   var before: Option[Sample] = None
@@ -42,11 +44,11 @@ run(term: Terminal)
     current match
       Some((s, u)) -> app.draw(g, s, u)
       None -> g.text(0, 0, if app.message.nonEmpty then app.message else "looking…")
-    term.present(g)
+    term.present(g)?
     val wait = due - time.monotonic()
     term.poll(if wait > time.millis(0) then wait else time.millis(0)) match
       Some(e) -> app.handle(e) match
-        Quit -> return
+        Quit -> return Ok(())
         Kill(pid) ->
           app.message = process.signal(pid, signal.Terminate) match
             Ok(()) -> s"sent TERM to $pid"

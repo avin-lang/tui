@@ -20,7 +20,7 @@ private ptyRun(arg: string) -> string
   assert(built.isOk, "building the probe failed")
   val script = "(sleep 1) | script -q /dev/null sh -c '\"$PROBE\" $ARG; echo STATUS=$?; stty -a'"
   val shown = Command("sh", "-c", script).withEnv("PROBE", dir + "/probe").withEnv("ARG", arg).output()
-  fs.removeDirAll(dir)
+  val _ = fs.removeDirAll(dir) // a temp directory that cannot be removed is no failure of the test
   shown.getOrElse("")
 
 @test("a trap with the terminal open leaves the screen after the message and restores the mode")
@@ -61,7 +61,7 @@ redirectedRefused()
     "(sleep 1) | script -q /dev/null sh -c '\"$PROBE\" close > \"$OUT\"; echo STATUS=$?'"
   ).withEnv("PROBE", dir + "/probe").withEnv("OUT", dir + "/out.txt").output().getOrElse("")
   val written = fs.readText(dir + "/out.txt").getOrElse("")
-  fs.removeDirAll(dir)
+  val _ = fs.removeDirAll(dir) // a temp directory that cannot be removed is no failure of the test
   assert(shown.contains("STATUS=1"), "refused")
   assert(written.contains("cannot open the terminal on standard output: not a terminal"), "the reason")
   assert(!written.contains("\u{1b}"), "no escape sequence reached the file")
