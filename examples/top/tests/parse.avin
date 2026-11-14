@@ -62,8 +62,8 @@ psNoCommand()
 
 @test("a user name beyond ASCII and a very long command are read whole")
 psUnicodeAndLong()
-  val long = "/x".repeat(2000)
-  val p = parsePsLine(s"  42  1 jürgen_日本 1.5 0.2 2048 0:01.50 0:01.00 S+ $long").get
+  val lengthy = "/x".repeat(2000)
+  val p = parsePsLine(s"  42  1 jürgen_日本 1.5 0.2 2048 0:01.50 0:01.00 S+ $lengthy").get
   assertEq(p.user, "jürgen_日本")
   assertEq(p.command.byteLength, 4000)
   assertEq(p.state, "S+")
