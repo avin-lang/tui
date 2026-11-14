@@ -2,7 +2,8 @@ module tests
 
 // Segmented gauges: how the cells are shared out against a budget, and how the gauge is drawn.
 import dev.avinlang.tui.{
-  Blue, BrightBlack, Cyan, Green, Grid, Magenta, Rect, Red, Segment, Style, gaugeCells, gaugeEighths
+  Blue, BrightBlack, Cyan, Green, Grid, Magenta, Rect, Red, Segment, Style, Yellow, gaugeCells,
+  gaugeEighths
 }
 
 @test("segments take their share of the budget, laid end to end")
@@ -133,7 +134,7 @@ gaugeEighthsDraw()
   )
   // cyan ends at 6 eighths, blue at 10: cell 0 is cyan's, cell 1 blue's, the rest empty
   assertEq(g.rowText(0), "▊▎··")
-  assertEq(g(0, 0).style, Style(Cyan, Red, 0))
+  assertEq(g(0, 0).style, Style(Cyan, Blue, 0))
   assertEq(g(1, 0).style, Style(Blue, Red, 0))
   assertEq(g(2, 0).style, empty)
   val h = Grid(6, 1)
@@ -229,4 +230,64 @@ gaugeMatchesTopMemBar()
           assertEq(after, width + 3)
           assertEq(got.rowText(0), want.rowText(0))
           for i in 0 ..< width + 4
-            assertEq(got(i, 0).style, want(i, 0).style)
+            if got(i, 0).style != want(i, 0).style
+              // a cell shared by the two segments: top's block sits on the default background, the
+              // gauge's on the colour of the segment after it
+              assertEq(got(i, 0).style, Style(want(i, 0).style.fg, Blue, want(i, 0).style.attrs))
+
+// A gauge 12 columns wide, ten cells of eighths, against a budget of 80 so an amount is its eighths.
+eighthsOf(segments: Vector[Segment]) -> Grid
+  val g = Grid(12, 1)
+  g.gauge(0, 0, 12, segments, 80.0, rest = ' ', eighths = true)
+  g
+
+// Each of the ten cells: whole blocks `#`, empty `.`, anything else as its glyph.
+glyphsOf(g: Grid) -> string = (1 .. 10).map(
+  x -> if g(x, 0).text == "█" then "#" elif g(x, 0).text == " " then "." else g(x, 0).text
+).mkString("")
+
+@test("an eighths gauge: a first segment of no eighths draws nothing, the next one starting at the first cell")
+gaugeEighthsZeroFirst()
+  val g = eighthsOf([Segment(0.0, Style.fg(Green)), Segment(24.0, Style.fg(Yellow))])
+  assertEq(glyphsOf(g), "###.......")
+  for x in 1 ..< 4
+    assertEq(g(x, 0).style, Style.fg(Yellow))
+  assertEq(g(0, 0).text, "[")
+  assertEq(g(11, 0).text, "]")
+
+@test("an eighths gauge: a tiny first segment is a sliver over the colour of the next, never a black cell")
+gaugeEighthsTinyFirst()
+  val g = eighthsOf([Segment(1.0, Style.fg(Cyan)), Segment(40.0, Style.fg(Blue))])
+  assertEq(glyphsOf(g), "▏####▏....")
+  assertEq(g(1, 0).style, Style(Cyan, Blue, 0))
+  assertEq(g(2, 0).style, Style.fg(Blue))
+  assertEq(g(6, 0).style, Style(Blue, Style.plain().bg, 0))
+
+@test("an eighths gauge: segments exactly filling whole cells draw whole cells and no blocks")
+gaugeEighthsExactCells()
+  val g = eighthsOf([Segment(16.0, Style.fg(Cyan)), Segment(8.0, Style.fg(Blue))])
+  assertEq(glyphsOf(g), "###.......")
+  assertEq(g(2, 0).style, Style.fg(Cyan))
+  assertEq(g(3, 0).style, Style.fg(Blue))
+
+@test("an eighths gauge: no amount draws an empty gauge and a full budget fills it")
+gaugeEighthsEmptyAndFull()
+  assertEq(glyphsOf(eighthsOf([Segment(0.0, Style.fg(Cyan)), Segment(0.0, Style.fg(Blue))])), "..........")
+  assertEq(glyphsOf(eighthsOf([])), "..........")
+  val g = eighthsOf([Segment(80.0, Style.fg(Cyan))])
+  assertEq(glyphsOf(g), "##########")
+  assertEq(g(10, 0).style, Style.fg(Cyan))
+
+@test("an eighths gauge: a cell shared by two segments is the first one's block over the second one's colour")
+gaugeEighthsSharedCell()
+  val g = eighthsOf([Segment(28.0, Style.fg(Cyan)), Segment(20.0, Style.fg(Blue))])
+  assertEq(glyphsOf(g), "###▌##....")
+  assertEq(g(4, 0).style, Style(Cyan, Blue, 0))
+  assertEq(g(5, 0).style, Style.fg(Blue))
+  // the last segment's partial cell sits on the empty background
+  val h = eighthsOf([Segment(28.0, Style.fg(Cyan))])
+  assertEq(glyphsOf(h), "###▌......")
+  assertEq(h(4, 0).style, Style(Cyan, Style.plain().bg, 0))
+  // a middle segment of no eighths is skipped when finding what follows
+  val m = eighthsOf([Segment(28.0, Style.fg(Cyan)), Segment(0.0, Style.fg(Red)), Segment(20.0, Style.fg(Blue))])
+  assertEq(m(4, 0).style, Style(Cyan, Blue, 0))

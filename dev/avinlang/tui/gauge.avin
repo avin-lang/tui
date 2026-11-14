@@ -58,9 +58,11 @@ impl Grid
   // With `eighths` the segments are placed in eighths of a cell (see `gaugeEighths`). Each cell is
   // drawn by the segment its left edge falls in: whole in the segment's character where the segment
   // covers all of it, and otherwise as a left block of the eighths it covers (`▏` to `▉`) in the
-  // segment's colour over `empty`'s background, as `meter` draws its last cell. A segment that
-  // begins inside a cell shows from the next one, so a segment drawn over the start of another is
-  // two segments end to end: the inner one, then the rest of the outer.
+  // segment's colour. The block's background is the colour of the segment that follows, so a cell
+  // shared by two segments shows both and never a black remainder; after the last segment it is
+  // `empty`'s background, as `meter` draws its last cell. A segment of no eighths draws nothing. A
+  // segment that begins inside a cell shows from the next one, so a segment drawn over the start of
+  // another is two segments end to end: the inner one, then the rest of the outer.
   gauge(
       x: int,
       y: int,
@@ -96,7 +98,12 @@ impl Grid
           val s = segments(j)
           val covered = ends(j) - start
           if covered >= 8 then cell(left + i, y, oneColumn(s.ch, '█'), s.style, c)
-          else cell(left + i, y, gaugeBlocks.chars(covered), Style(s.style.fg, empty.bg, s.style.attrs), c)
+          else
+            var k = j + 1
+            while k < ends.length && ends(k) <= ends(j)
+              k += 1
+            val behind = if k < ends.length then segments(k).style.fg else empty.bg
+            cell(left + i, y, gaugeBlocks.chars(covered), Style(s.style.fg, behind, s.style.attrs), c)
       return x + width
     var col = left
     for (s, n) in segments.zip(gaugeCells(inner, segments, budget))
