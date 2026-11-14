@@ -107,7 +107,7 @@ private enterSequence(o: Options) -> string
 // colour, a `TERM` naming `256color` is the palette, and anything else the sixteen. `NO_COLOR` does
 // not change it: a full-screen program's colours are part of what it draws.
 detectColorMode(colorTerm: Option[string], term: Option[string]) -> ColorMode
-  val ct = colorTerm.getOrElse("").toLowerCase
+  val ct = colorTerm.getOrElse("").toLower
   if ct == "truecolor" || ct == "24bit" then return TrueColor
   if term.getOrElse("").contains("256color") then Palette256 else Basic16
 

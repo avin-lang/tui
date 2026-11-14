@@ -9,7 +9,7 @@ The module is `dev.avinlang.tui`.
 
 ```hocon
 dependencies {
-  tui { git = "github.com/avin-lang/tui", version = "0.2.5" }
+  tui { git = "github.com/avin-lang/tui", version = "0.2.6" }
 }
 ```
 

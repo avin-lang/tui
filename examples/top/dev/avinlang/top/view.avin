@@ -39,8 +39,8 @@ private compareRows(a: Row, b: Row, key: SortKey) -> int
 // The rows whose command holds `text`, letter case aside; all of them for an empty `text`.
 filterRows(rows: Vector[Row], text: string) -> Vector[Row]
   if text.isEmpty then return rows
-  val needle = text.toLowerCase
-  rows.filter(r -> r.proc.command.toLowerCase.contains(needle))
+  val needle = text.toLower
+  rows.filter(r -> r.proc.command.toLower.contains(needle))
 
 // The rows as a tree by parent: each process followed by its children, indented under it, siblings
 // in the order of `rows`. A process whose parent is not among the rows (or is itself) is a root. A

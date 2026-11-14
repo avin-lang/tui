@@ -5,21 +5,7 @@ module tests
 import dev.avinlang.tui as tui
 
 import dev.avinlang.tui.{
-  Basic,
-  Bold,
-  Cluster,
-  Default,
-  Dim,
-  Grid,
-  Indexed,
-  Italic,
-  Renderer,
-  Reverse,
-  Rgb,
-  Style,
-  Underline,
-  cursorMove,
-  sgr
+  Basic, Bold, Cluster, Default, Dim, Grid, Indexed, Italic, Renderer, Reverse, Rgb, Style, Underline, cursorMove, sgr
 }
 
 import dev.avinlang.tui.{Basic16, Palette256, TrueColor}

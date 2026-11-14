@@ -49,12 +49,10 @@ splitSizes(total: int, sizes: Vector[Size], gap: int = 0) -> Vector[int]
 // The cells a fixed part or a fraction asks for, or -1 for a fill.
 private wanted(s: Size, whole: int) -> int
 wanted(Fixed(n), _) = maxOf(n, 0)
-
 wanted(Fraction(num, den), whole) = if den <= 0 || num <= 0 then 0 else minOf(
   int(long(whole) * long(num) / long(den)),
   whole
 )
-
 wanted(Fill(_), _) = -1
 
 private weightOf(s: Size) -> int

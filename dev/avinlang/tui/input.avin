@@ -326,12 +326,10 @@ class Decoder()
 // What a mouse report's button number `b` and final byte say the mouse did: 64 and up are the wheel,
 // 32 is motion, and otherwise `M` presses and `m` releases.
 private mouseAction(b: int, fin: char) -> MouseAction
-
 mouseAction(b, _)
   | (b & 64) != 0 = wheel(b & 3)
   | (b & 32) != 0 && (b & 3) == 3 = Move
   | (b & 32) != 0 = Drag
-
 mouseAction(_, 'm') = Release
 mouseAction(_, _) = Press
 

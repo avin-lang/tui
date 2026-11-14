@@ -5,18 +5,7 @@ module tests
 import dev.avinlang.tui as tui
 
 import dev.avinlang.tui.{
-  Alt,
-  Basic16,
-  Bold,
-  Ctrl,
-  Dim,
-  Palette256,
-  Shift,
-  Style,
-  TrueColor,
-  Underline,
-  detectColorMode,
-  keyName
+  Alt, Basic16, Bold, Ctrl, Dim, Palette256, Shift, Style, TrueColor, Underline, detectColorMode, keyName
 }
 
 @test("COLORTERM of truecolor or 24bit, in any case, is any colour")

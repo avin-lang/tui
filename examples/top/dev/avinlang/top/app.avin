@@ -1,38 +1,8 @@
 module dev.avinlang.top
 
 import dev.avinlang.tui.{
-  Backspace,
-  Black,
-  Bold,
-  Char,
-  Column,
-  Ctrl,
-  Cyan,
-  Down,
-  End,
-  Enter,
-  Escape,
-  Event,
-  F,
-  Grid,
-  Home,
-  Key,
-  KeyPress,
-  Mouse,
-  PageDown,
-  PageUp,
-  Paste,
-  Rect,
-  Red,
-  Rounded,
-  ScrollDown,
-  ScrollUp,
-  Stop,
-  Style,
-  Table,
-  Up,
-  Yellow,
-  textWidth
+  Backspace, Black, Bold, Char, Column, Ctrl, Cyan, Down, End, Enter, Escape, Event, F, Grid, Home, Key, KeyPress,
+  Mouse, PageDown, PageUp, Paste, Rect, Red, Rounded, ScrollDown, ScrollUp, Stop, Style, Table, Up, Yellow, textWidth
 }
 
 // What the program does after a key: nothing beyond drawing again, end, or send `Terminate` to a

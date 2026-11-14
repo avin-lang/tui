@@ -12,22 +12,8 @@ data ColorMode
 // The red, green and blue the sixteen basic colours have in xterm's default palette, which is what a
 // colour is matched against when it is brought down to sixteen.
 private val basicRgb: Array[int] = [
-  0x000000,
-  0xcd0000,
-  0x00cd00,
-  0xcdcd00,
-  0x0000ee,
-  0xcd00cd,
-  0x00cdcd,
-  0xe5e5e5,
-  0x7f7f7f,
-  0xff0000,
-  0x00ff00,
-  0xffff00,
-  0x5c5cff,
-  0xff00ff,
-  0x00ffff,
-  0xffffff
+  0x000000, 0xcd0000, 0x00cd00, 0xcdcd00, 0x0000ee, 0xcd00cd, 0x00cdcd, 0xe5e5e5, 0x7f7f7f, 0xff0000, 0x00ff00,
+  0xffff00, 0x5c5cff, 0xff00ff, 0x00ffff, 0xffffff
 ]
 
 // The levels of each channel in the palette's 6 by 6 by 6 cube.
@@ -42,21 +28,17 @@ reduce(c, TrueColor) = c
 reduce(Indexed(n), Palette256) = Indexed(n)
 reduce(Rgb(r, g, b), Palette256) = Indexed(nearest256(r, g, b))
 reduce(Indexed(n < 16), Basic16) = Basic(n)
-
 reduce(Indexed(n), Basic16) =
   val rgb = indexedRgb(n)
   Basic(nearest16(rgb >> 16, (rgb >> 8) & 0xff, rgb & 0xff))
-
 reduce(Rgb(r, g, b), Basic16) = Basic(nearest16(r, g, b))
 
 // The red, green and blue, packed as `0xrrggbb`, of the palette's colour `n`.
 indexedRgb(n: int) -> int
 indexedRgb(n < 16) = basicRgb(n)
-
 indexedRgb(n < 232) =
   val k = n - 16
   (cubeLevels(k / 36) << 16) | (cubeLevels((k / 6) % 6) << 8) | cubeLevels(k % 6)
-
 indexedRgb(n) =
   val v = 8 + 10 * (n - 232)
   (v << 16) | (v << 8) | v

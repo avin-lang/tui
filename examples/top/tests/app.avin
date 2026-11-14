@@ -4,27 +4,8 @@ module tests
 import dev.avinlang.top.{App, ByCpu, ByMem, ByPid, ByTime, Kill, Quit, Sample, Stay, Usage, usage}
 
 import dev.avinlang.tui.{
-  Backspace,
-  Char,
-  Ctrl,
-  Down,
-  End,
-  Enter,
-  Escape,
-  Event,
-  F,
-  Home,
-  KeyPress,
-  Mouse,
-  MouseEvent,
-  PageDown,
-  PageUp,
-  Paste,
-  Resize,
-  ScrollDown,
-  ScrollUp,
-  Stop,
-  Up
+  Backspace, Char, Ctrl, Down, End, Enter, Escape, Event, F, Home, KeyPress, Mouse, MouseEvent, PageDown, PageUp, Paste,
+  Resize, ScrollDown, ScrollUp, Stop, Up
 }
 
 key(c: char) -> Event = KeyPress(Char(c), 0)

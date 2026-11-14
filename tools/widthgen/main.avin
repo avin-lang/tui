@@ -56,7 +56,9 @@ main(args: Vector[string]) -> int
   out.write(s"// The Unicode version the tables below are read from.\n")
   out.write(s"val unicodeVersion: string = \"$version\"\n\n")
   table(out, "zeroWidthRanges", "Characters that take no column of their own.", minus(merged(zero), shown))
+  out.write("\n")
   table(out, "wideRanges", "Characters that take two columns: East Asian Wide and Fullwidth.", merged(wide))
+  out.write("\n")
   table(out, "emojiRanges", "Characters beyond ASCII with the Emoji property.", merged(pictures))
   fs.writeText(args(1), out.text) match
     Ok(_) ->
@@ -131,17 +133,32 @@ private minus(spans: Vector[Span], holes: Vector[Span]) -> Vector[Span]
     if from <= s.last then out.append(Span(from, s.last))
   out.toVector
 
-// Writes `spans` as a flat array of first and last code points, eight spans to a line.
+// The widest line `avin fmt` fills a literal's elements to, so that the table is written as it would
+// format it.
+private val lineWidth = 120
+
+// Writes `spans` as a flat array of first and last code points, as many to a line as fit in
+// `lineWidth` columns.
 private table(out: StringWriter, name: string, doc: string, spans: Vector[Span])
   out.write(s"// $doc Pairs of first and last code points, sorted.\n")
   out.write(s"private val $name: Array[int] = [\n")
-  var i = 0
+  val points = Buffer[int]()
   for s in spans
-    if i % 8 == 0 then out.write("    ")
-    out.write(s"0x${hexText(s.first)}, 0x${hexText(s.last)}")
-    i += 1
-    if i < spans.length then out.write(if i % 8 == 0 then ",\n" else ", ")
-  out.write("\n]\n\n")
+    points.append(s.first)
+    points.append(s.last)
+  var column = 0
+  for i in 0 ..< points.length
+    val item = "0x" + hexText(points(i)) + (if i < points.length - 1 then "," else "")
+    if column == 0
+      out.write("  " + item)
+      column = 2 + item.byteLength
+    else if column + 1 + item.byteLength <= lineWidth
+      out.write(" " + item)
+      column += 1 + item.byteLength
+    else
+      out.write("\n  " + item)
+      column = 2 + item.byteLength
+  out.write("\n]\n")
 
 private hexText(n: int) -> string
   val digits = "0123456789abcdef"

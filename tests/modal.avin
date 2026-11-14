@@ -2,20 +2,7 @@ module tests
 
 // The modal stack: where a modal is drawn and how, which events it takes, and the two modals tui has.
 import dev.avinlang.tui.{
-  Char,
-  Confirm,
-  Drag,
-  Escape,
-  Grid,
-  KeyPress,
-  MessageBox,
-  ModalStack,
-  Mouse,
-  MouseEvent,
-  Press,
-  Rect,
-  Resize,
-  Stop
+  Char, Confirm, Drag, Escape, Grid, KeyPress, MessageBox, ModalStack, Mouse, MouseEvent, Press, Rect, Resize, Stop
 }
 
 @test("an empty stack takes no event and draws nothing")
@@ -39,10 +26,7 @@ modalMessageDraws()
   assertEq(
     rows(g),
     [
-      "base                ",
-      "     ╭─help───╮     ",
-      "     │ q quit │     ",
-      "     ╰────────╯     ",
+      "base                ", "     ╭─help───╮     ", "     │ q quit │     ", "     ╰────────╯     ",
       "                    "
     ]
   )
@@ -100,12 +84,8 @@ modalConfirmDraws()
   assertEq(
     rows(g),
     [
-      "  ╭─kill────────╮   ",
-      "  │ Kill job 7? │   ",
-      "  │             │   ",
-      "  │ y yes  n no │   ",
-      "  ╰─────────────╯   ",
-      "                    "
+      "  ╭─kill────────╮   ", "  │ Kill job 7? │   ", "  │             │   ", "  │ y yes  n no │   ",
+      "  ╰─────────────╯   ", "                    "
     ]
   )
 

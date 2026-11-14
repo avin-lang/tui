@@ -17,7 +17,6 @@ data Usage(total: CpuShare, cores: Vector[CpuShare], procs: Map[long, real])
 // read as idle and each process gets the system's own recent average.
 usage(before: Option[Sample], after: Sample) -> Usage
 usage(None, s) = Usage(CpuShare(0.0, 0.0), s.cores.map(_ -> CpuShare(0.0, 0.0)), firstLook(s.procs))
-
 usage(Some(b), s) =
   val gone = HashMap[long, Proc]() ++ b.procs.map(p -> (p.pid, p))
   val wall = s.at - b.at

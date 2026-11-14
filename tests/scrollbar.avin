@@ -3,19 +3,7 @@ module tests
 // The vertical scrollbar: where its thumb sits and how big it is, how it is drawn, and the bar a
 // table and a scroll view draw down their right edge when asked to.
 import dev.avinlang.tui.{
-  Blue,
-  BrightBlack,
-  Column,
-  Cyan,
-  Grid,
-  Home,
-  LogView,
-  Rect,
-  ScrollView,
-  Scrollbar,
-  Style,
-  Table,
-  scrollThumb
+  Blue, BrightBlack, Column, Cyan, Grid, Home, LogView, Rect, ScrollView, Scrollbar, Style, Table, scrollThumb
 }
 
 // Whether two grids hold the same cells, text and style, everywhere.

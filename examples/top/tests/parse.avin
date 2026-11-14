@@ -3,22 +3,8 @@ module tests
 // The readers of what ps, sysctl and vm_stat print, from samples captured on a Mac and from the odd
 // lines a machine can produce.
 import dev.avinlang.top.{
-  Load,
-  Memory,
-  Proc,
-  Swap,
-  VmStat,
-  fields,
-  parseBootTime,
-  parseClock,
-  parseLoad,
-  parsePs,
-  parsePsLine,
-  parseSize,
-  parseSwap,
-  parseSysctl,
-  parseVmStat,
-  psFormat
+  Load, Memory, Proc, Swap, VmStat, fields, parseBootTime, parseClock, parseLoad, parsePs, parsePsLine, parseSize,
+  parseSwap, parseSysctl, parseVmStat, psFormat
 }
 
 val psSample: string = """

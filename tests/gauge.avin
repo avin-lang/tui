@@ -2,18 +2,7 @@ module tests
 
 // Segmented gauges: how the cells are shared out against a budget, and how the gauge is drawn.
 import dev.avinlang.tui.{
-  Blue,
-  BrightBlack,
-  Cyan,
-  Green,
-  Grid,
-  Magenta,
-  Rect,
-  Red,
-  Segment,
-  Style,
-  gaugeCells,
-  gaugeEighths
+  Blue, BrightBlack, Cyan, Green, Grid, Magenta, Rect, Red, Segment, Style, gaugeCells, gaugeEighths
 }
 
 @test("segments take their share of the budget, laid end to end")

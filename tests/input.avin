@@ -7,23 +7,7 @@ import dev.avinlang.tui as tui
 import dev.avinlang.tui.{Alt, Ctrl, Decoder, Event, KeyPress, Mouse, MouseEvent, Paste, Shift}
 
 import dev.avinlang.tui.{
-  BackTab,
-  Backspace,
-  Char,
-  Delete,
-  Down,
-  End,
-  Enter,
-  Escape,
-  F,
-  Home,
-  Insert,
-  Left,
-  PageDown,
-  PageUp,
-  Right,
-  Tab,
-  Up
+  BackTab, Backspace, Char, Delete, Down, End, Enter, Escape, F, Home, Insert, Left, PageDown, PageUp, Right, Tab, Up
 }
 
 import dev.avinlang.tui.{Drag, Move, Press, Release, ScrollDown, ScrollLeft, ScrollRight, ScrollUp}

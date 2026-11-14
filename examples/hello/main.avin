@@ -1,45 +1,31 @@
 // A box with a live clock, a meter filling and emptying with the seconds, and the last keys pressed.
 // Press q to quit.
+import avin.io.IoError
 import avin.time
 import dev.avinlang.tui
 
 import dev.avinlang.tui.{
-  Bold,
-  Char,
-  Ctrl,
-  Cyan,
-  Event,
-  Green,
-  Grid,
-  KeyPress,
-  Mouse,
-  Options,
-  Paste,
-  Rect,
-  Resize,
-  Rounded,
-  Stop,
-  Style,
-  Terminal,
-  Yellow
+  Bold, Char, Ctrl, Cyan, Event, Green, Grid, KeyPress, Mouse, Options, Paste, Rect, Resize, Rounded, Stop, Style,
+  Terminal, Yellow
 }
 
-main() -> int = Terminal.use(Options(mouse = true), run) match
+main() -> int = Terminal.use(Options(mouse = true), run).flatMap(r -> r) match
   Ok(()) -> 0
   Err(e) ->
     eprintln(s"hello: ${e.message}")
     1
 
-// Draws a frame, then waits a quarter of a second for something to happen, until q.
-run(term: Terminal)
+// Draws a frame, then waits a quarter of a second for something to happen, until q. A frame that
+// cannot be written ends it with the error.
+run(term: Terminal) -> Result[unit, IoError]
   val keys = Buffer[string]()
   loop
     val g = term.frame()
     draw(g, keys)
-    term.present(g)
+    term.present(g)?
     term.poll(time.millis(250)) match
-      Some(KeyPress(Char('q'), 0)) -> return
-      Some(Stop(_)) -> return
+      Some(KeyPress(Char('q'), 0)) -> return Ok(())
+      Some(Stop(_)) -> return Ok(())
       Some(e) -> remember(keys, describe(e))
       None -> ()
 

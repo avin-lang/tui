@@ -2,20 +2,7 @@ module tests
 
 // The table's rows: sorting, filtering, the tree, and the text of each cell.
 import dev.avinlang.top.{
-  ByCpu,
-  ByMem,
-  ByPid,
-  ByTime,
-  Row,
-  bytes,
-  cells,
-  clock,
-  filterRows,
-  kib,
-  sortRows,
-  sortTitle,
-  treeRows,
-  uptime
+  ByCpu, ByMem, ByPid, ByTime, Row, bytes, cells, clock, filterRows, kib, sortRows, sortTitle, treeRows, uptime
 }
 
 row(pid: long, cpu: real = 0.0, ppid: long = 1, command: string = "cmd", rss: long = 1000, time: long = 0) -> Row =
