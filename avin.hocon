@@ -1,1 +1,1 @@
-package { name = "tui", version = "0.2.7", description = "Terminal user interfaces: raw mode, a double-buffered cell grid drawn by difference, key and mouse input, layout, and widgets" }
+package { name = "tui", version = "0.2.8", description = "Terminal user interfaces: raw mode, a double-buffered cell grid drawn by difference, key and mouse input, layout, and widgets" }

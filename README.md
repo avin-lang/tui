@@ -9,7 +9,7 @@ The module is `dev.avinlang.tui`.
 
 ```hocon
 dependencies {
-  tui { git = "github.com/avin-lang/tui", version = "0.2.7" }
+  tui { git = "github.com/avin-lang/tui", version = "0.2.8" }
 }
 ```
 
@@ -197,6 +197,19 @@ another is two segments end to end, the inner one and then the rest of the outer
 ```text
 g.gauge(6, 2, 22, [Segment(real(reserved), Style.fg(Cyan)), Segment(real(held - reserved), Style.fg(Blue))], real(budget), rest = ' ', eighths = true)
 ```
+
+`bars = true` draws the gauge as htop draws its meters: a `|` in each segment's style for every cell
+it covers, blanks after them, and a segment of more than nothing at least one cell wherever the gauge
+fills any (`gaugeBars`). A `label`, in any mode, is written inside the brackets against `]`, over
+the bar's end; each of its characters takes the style of the cell it replaces, and a label wider
+than the inside is cut at its end:
+
+```text
+g.text(0, 3, "mem")
+g.gauge(3, 3, 24, [Segment(real(used), Style.fg(Green)), Segment(real(cache), Style.fg(Yellow))], real(total), bars = true, label = "33.6G/64.0G")
+```
+
+draws `mem[|||||||    33.6G/64.0G]`.
 
 ## Small helpers
 
