@@ -1,13 +1,35 @@
 // Opens a terminal and ends it as the argument says: `exit` calls exit(3), `trap` fails, `close` closes
-// it and returns. Run in a pty by tests/pty.avin.
+// it and returns, and `keys` polls for events until `q` is typed, then closes it and says what came:
+// the characters typed, and whether a poll ran out before the first. Run in a pty by tests/pty.avin.
 import avin.process
-import dev.avinlang.tui.Terminal
+import avin.time
+import dev.avinlang.tui.{Char, KeyPress, Terminal}
+
+// Polls `term` until `q` is typed or the input ends: the characters typed before `q`, and whether a
+// poll answered `None` before any came.
+keys(term: Terminal) -> (string, bool)
+  var typed = ""
+  var waited = false
+  var polls = 0
+  while polls < 200
+    polls += 1
+    term.poll(time.millis(100)) match
+      Some(KeyPress(Char('q'), _)) -> return (typed, waited)
+      Some(KeyPress(Char(c), _)) -> typed = typed + c.toString()
+      Some(_) -> ()
+      None -> if typed == "" then waited = true
+  (typed, waited)
 
 main(args: Vector[string]) -> int = Terminal.open() match
   Ok(term) ->
     args(0) match
       "exit" -> process.exit(3)
       "trap" -> fail("boom")
+      "keys" ->
+        val (typed, waited) = keys(term)
+        term.close()
+        println(s"TYPED=$typed WAITED=$waited")
+        0
       _ ->
         term.close()
         0

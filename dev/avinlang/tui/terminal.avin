@@ -1,9 +1,9 @@
 module dev.avinlang.tui
 
 // The terminal itself: raw mode, the alternate screen, the window's size, input as events, and frames
-// drawn by difference. Everything here but six calls into Sysl's library is Avin: whether a
-// descriptor is a terminal, its size, raw mode on and off, waiting for input with a time limit, and
-// reading it.
+// drawn by difference. Everything here but four calls into Sysl's library is Avin: whether a
+// descriptor is a terminal, its size, and raw mode on and off. Input is `io.stdin()`, waited on in a
+// `select` with a time limit and read for what has come.
 
 import avin.io
 import avin.io.IoError
@@ -31,41 +31,6 @@ private data WindowSize(rows: int, cols: int)
 @sysl("sysl.posix.tty.window_size")
 private windowSize(fd: int) -> Option[WindowSize]
 
-@sysl("sysl.io.wait.Interest")
-private data Interest
-  Readable
-  Writable
-
-@sysl("sysl.time.Duration")
-private data WaitTime(us: long)
-
-@sysl("sysl.fs.IoError")
-private data SyslError
-  NotFound
-  PermissionDenied
-  AlreadyExists
-  NotADirectory
-  IsADirectory
-  DirectoryNotEmpty
-  TooManyOpenFiles
-  NoSpaceLeft
-  Interrupted
-  NotOpen
-  NotPermitted
-  InvalidUtf8(offset: long)
-  Other(code: int)
-
-@sysl("sysl.io.wait.ready", blocking)
-private ready(fd: int, interest: Interest, timeout: WaitTime) -> Result[bool, SyslError]
-
-@sysl("sysl.io.FdReader")
-private class FdReader
-  @sysl(blocking)
-  read(into: Array[byte]) -> Array[byte]
-
-@sysl("sysl.io.fd_reader")
-private fdReader(fd: int) -> FdReader
-
 private val InputFd: int = 0
 private val OutputFd: int = 1
 
@@ -75,6 +40,9 @@ private val EscapeDelay: avin.time.Duration = time.millis(25)
 
 // The longest a wait for input goes without looking at the signals.
 private val SignalSlice: avin.time.Duration = time.millis(50)
+
+// The most input one read takes.
+private val InputChunk: int = 4096
 
 // What a terminal is opened with.
 data Options(
@@ -127,7 +95,6 @@ detectColorMode(colorTerm: Option[string], term: Option[string]) -> ColorMode
 // so a program decides what Ctrl-C does. A `Terminate`, `Hangup` or `Interrupt` sent from outside
 // arrives as a `Stop` event, and so does the end of the input.
 class Terminal(val options: Options, val colorMode: ColorMode, private val hook: ExitHook)
-  private val reader = fdReader(InputFd)
   private val decoder = Decoder()
   private val renderer = Renderer(colorMode)
   private val resized: Watch = watchOrFail(signal.WindowChange)
@@ -139,7 +106,6 @@ class Terminal(val options: Options, val colorMode: ColorMode, private val hook:
   private var cols = 80
   private var rows = 24
   private var open = true
-  private val chunk: Array[byte] = Array.fill(4096, byte(0))
 
   // The terminal's width and height in cells, as of the last resize.
   width() -> int = cols
@@ -203,17 +169,21 @@ class Terminal(val options: Options, val colorMode: ColorMode, private val hook:
       None -> ()
 
   // Waits at most `limit` for input and reads what there is, answering whether anything arrived.
-  // The end of the input marks the terminal closed.
+  // The end of the input, or a read that fails, marks the terminal closed.
   private waitAndRead(limit: avin.time.Duration) -> bool
-    ready(InputFd, Readable, WaitTime(limit.micros)) match
-      Ok(true) -> ()
-      _ -> return false
-    val got = reader.read(chunk)
-    if got.length == 0
-      open = false
-      return true
-    decoder.feed(got)
-    true
+    val input = io.stdin()
+    val arrived = select
+      input.readable() -> true
+      after limit -> false
+    if !arrived then return false
+    input.readAvailable(InputChunk) match
+      Ok(Some(got)) ->
+        if got.length == 0 then open = false else decoder.feed(got)
+        true
+      Ok(None) -> false
+      Err(_) ->
+        open = false
+        true
 
 object Terminal
   // Puts the terminal on standard input into raw mode and onto the alternate screen, and answers it.

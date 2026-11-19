@@ -11,14 +11,17 @@ private val Leave: string = "\u{1b}[?1049l"
 
 // Builds the probe, runs it under a pty with `arg`, then `stty -a` in the same pty; answers everything
 // the pty showed, and the status the probe ended with is in it as `STATUS=<n>`.
-private ptyRun(arg: string) -> string
+private ptyRun(arg: string) -> string = ptyRunFed(arg, "sleep 1")
+
+// `ptyRun`, with what the shell commands `feed` write typed into the pty.
+private ptyRunFed(arg: string, feed: string) -> string
   val dir = fs.createTempDir("tui-pty-").getOrElse("")
   assert(dir != "")
   val compiler = process.env("AVIN_COMPILER").getOrElse("avin")
   val source = process.currentDir().getOrElse("") + "/testdata/ptyprobe"
   val built = Command(compiler, "build", source, "-o", dir + "/probe").output()
   assert(built.isOk, "building the probe failed")
-  val script = "(sleep 1) | script -q /dev/null sh -c '\"$PROBE\" $ARG; echo STATUS=$?; stty -a'"
+  val script = "(" + feed + ") | script -q /dev/null sh -c '\"$PROBE\" $ARG; echo STATUS=$?; stty -a'"
   val shown = Command("sh", "-c", script).withEnv("PROBE", dir + "/probe").withEnv("ARG", arg).output()
   val _ = fs.removeDirAll(dir) // a temp directory that cannot be removed is no failure of the test
   shown.getOrElse("")
@@ -47,6 +50,13 @@ closeRestores()
   val shown = ptyRun("close")
   assert(shown.contains("STATUS=0"), "a normal end")
   assert(shown.indexOf(Leave) == shown.lastIndexOf(Leave), "the leave sequence is written once")
+  assert(shown.contains("lflags: icanon") && shown.contains(" echo "), "cooked mode again")
+
+@test("poll answers None while nothing is typed, then each key as it is typed, in order")
+pollReadsKeys()
+  val shown = ptyRunFed("keys", "sleep 1; printf ab; sleep 0.3; printf 'cé'; sleep 0.3; printf q; sleep 1")
+  assert(shown.contains("TYPED=abcé WAITED=true"), s"the keys: $shown")
+  assert(shown.contains("STATUS=0"), "a normal end")
   assert(shown.contains("lflags: icanon") && shown.contains(" echo "), "cooked mode again")
 
 @test("standard output that is not a terminal is refused")

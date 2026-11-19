@@ -2,8 +2,8 @@
 
 Terminal user interfaces in Avin: raw mode and the alternate screen, a grid of cells drawn by
 difference, keys, mouse and paste read from raw bytes, and a few small widgets. Everything is Avin
-code except six calls into Sysl's library: whether a descriptor is a terminal, its size, raw mode
-on and off, waiting for input with a time limit, and reading it.
+code except four calls into Sysl's library: whether a descriptor is a terminal, its size, and raw
+mode on and off. Input is read from `io.stdin()`, waited on in a `select` with a time limit.
 
 The module is `dev.avinlang.tui`.
 

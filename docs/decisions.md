@@ -6,8 +6,9 @@ the user: the width rules, and frames on standard output, refused when it is not
 
 ## Events come from a blocking `poll(timeout)` on the caller's thread
 
-`Terminal.poll(timeout)` waits on standard input with `sysl.io.wait.ready`, in slices of at most 50
-ms, looking at the resize and stop signals between slices, and answers the first event or `None`.
+`Terminal.poll(timeout)` waits on standard input in a `select` on `io.stdin().readable()` with an
+`after`, in slices of at most 50 ms, looking at the resize and stop signals between slices, takes
+what has come with `io.stdin().readAvailable`, and answers the first event or `None`.
 
 - **Why:** a full-screen program is a loop of "draw, then wait for input or the next tick", which is
   exactly one call. No thread is started, nothing is shared, and the decoder and terminal state stay
