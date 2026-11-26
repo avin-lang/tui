@@ -95,23 +95,84 @@ class MessageBox(val heading: string, val text: string, val style: Style = Style
       _ -> true
 
 // A question answered with `y` or `n`: `answer` is called with true for `y` or `Y`, false for `n`,
-// `N` or Escape, and the box closes; any other key leaves it open.
+// `N` or Escape, and the box closes; any other key leaves it open. A click on an answer's key or
+// word answers it the same way; a click anywhere else leaves it open.
+//
+// Inside the border, one column in from each side: the question, wrapped (none when empty); the
+// `details`, one label and value to a row, the labels in `labelStyle` in a column and each value cut
+// with `…` at the edge; a blank row; and the answers, `y yes  n no` with the defaults, each key in
+// `keyStyle` and its word (`yes`, `no`) in `style`. Where the box has fewer rows than all that, the
+// answers keep the bottom row and the question the rows above it, and the blank row and then the
+// last details give way; where it is narrower than the answers, their keys show alone, `y  n`.
+// `details` may be changed while it is open (a clock counting on), and the next draw shows them.
 class Confirm(
     val heading: string,
     val question: string,
     val answer: (bool) -> unit,
-    val style: Style = Style.plain()
+    val style: Style = Style.plain(),
+    var details: Vector[(string, string)] = [],
+    val yes: string = "yes",
+    val no: string = "no",
+    val keyStyle: Style = Style.plain().with(Bold),
+    val labelStyle: Style = Style.plain().with(Bold)
 ): Modal
+  // Where the last draw put the answers: their row, and the columns from the start of each to the
+  // start of the next (`noEnd` the column after `no`'s word), and the column after the box's inside,
+  // where they are cut. No row before the first draw.
+  private var answersRow: int = -1
+  private var yesAt: int = 0
+  private var noAt: int = 0
+  private var noEnd: int = 0
+  private var answersEnd: int = 0
+
   override title() -> string = heading
 
+  // As wide as the widest of the title, the question's lines, the details and the answers, a column
+  // of padding each side, held to `maxWidth`; as high as the question wraps to, the details, and the
+  // blank row and answers, held to `maxHeight`.
   override measure(maxWidth: int, maxHeight: int) -> (int, int)
-    val w = minOf(maxOf(maxOf(textWidth(question), textWidth(Prompt)), textWidth(heading)) + 2, maxWidth)
-    (w, minOf(wrap(question, maxOf(w - 2, 1)).length + 2, maxHeight))
+    var widest = maxOf(textWidth(heading), answersWidth())
+    if question.nonEmpty
+      for line in question.split("\n")
+        widest = maxOf(widest, textWidth(line))
+    widest = maxOf(widest, detailsWidth())
+    val w = minOf(widest + 2, maxWidth)
+    (w, minOf(questionLines(maxOf(w - 2, 1)) + details.length + (if above(maxOf(w - 2, 1)) > 0 then 2 else 1), maxHeight))
 
   override draw(g: Grid, r: Rect)
     val inside = r.pad(1, 0)
-    g.textBlock(Rect(inside.x, inside.y, inside.w, maxOf(inside.h - 2, 1)), question, style)
-    if inside.h >= 3 then g.textIn(inside.x, inside.bottom() - 1, inside.w, Prompt, style.with(Bold), 0, inside)
+    if inside.isEmpty() then return
+    // the answers on the bottom row; the question from the top, as many of its rows as fit above
+    // them; then the blank row and the details, the blank row given up first
+    val y = inside.bottom() - 1
+    var free = inside.h - 1
+    val asked = minOf(questionLines(inside.w), free)
+    if asked > 0 then g.textBlock(Rect(inside.x, inside.y, inside.w, asked), question, style)
+    free -= asked
+    val blank = if details.nonEmpty && free > details.length then 1 elif details.isEmpty && asked > 0 && free > 0 then 1 else 0
+    val shown = minOf(details.length, free - blank)
+    if shown > 0
+      g.labelValues(Rect(inside.x, inside.y + asked, inside.w, shown), details.take(shown), labelStyle, style, 2, inside)
+    // too narrow for the words, the keys alone: `y  n`
+    val whole = answersWidth() <= inside.w
+    val yesWord = if whole then yes else ""
+    val noWord = if whole then no else ""
+    answersRow = y
+    yesAt = inside.x
+    noAt = inside.x + hintWidth("y", yesWord) + AnswerGap
+    noEnd = noAt + hintWidth("n", noWord)
+    answersEnd = inside.right()
+    g.keyHints(
+      inside.x,
+      y,
+      [("y", yesWord), ("n", noWord)],
+      keyStyle,
+      style,
+      Rect(inside.x, y, inside.w, 1),
+      1,
+      AnswerGap,
+      true
+    )
 
   override handle(e: Event) -> bool
     e match
@@ -120,7 +181,36 @@ class Confirm(
       KeyPress(Char('n'), _) -> answer(false)
       KeyPress(Char('N'), _) -> answer(false)
       KeyPress(Escape, _) -> answer(false)
+      Mouse(m) if clicked(m, yesAt, noAt - AnswerGap) -> answer(true)
+      Mouse(m) if clicked(m, noAt, noEnd) -> answer(false)
       _ -> return true
     false
 
-private val Prompt: string = "y yes  n no"
+  // Whether `m` is a press on the answers' row between columns `from` and `to`, where it was drawn.
+  private clicked(m: MouseEvent, from: int, to: int) -> bool =
+    m.action == Press && m.y == answersRow && m.x >= from && m.x < minOf(to, answersEnd)
+
+  // The rows the question wraps to at `width`, 0 for none.
+  private questionLines(width: int) -> int = if question.isEmpty then 0 else wrap(question, width).length
+
+  // The rows above the blank row at `width`: the question's and the details'.
+  private above(width: int) -> int = questionLines(width) + details.length
+
+  // The columns the answers take: `y yes  n no`.
+  private answersWidth() -> int = hintWidth("y", yes) + AnswerGap + hintWidth("n", no)
+
+  // The columns one answer takes: its key, and a blank and its word when it has one.
+  private hintWidth(key: string, word: string) -> int = textWidth(key) + (if word.isEmpty then 0 else 1 + textWidth(word))
+
+  // The columns the details take: the widest label, the gap, and the widest value; 0 for none.
+  private detailsWidth() -> int
+    if details.isEmpty then return 0
+    var label = 0
+    var value = 0
+    for (l, v) in details
+      label = maxOf(label, textWidth(l))
+      value = maxOf(value, textWidth(v))
+    label + 2 + value
+
+// The blank columns between a `Confirm`'s two answers.
+private val AnswerGap: int = 2

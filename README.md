@@ -172,11 +172,17 @@ val rows = g.textBlock(r, description, Style.fg(BrightBlack))
 
 A `ModalStack` draws each modal centred over the screen in a bordered box, and its `handle` gives
 keys, mouse and paste to the top one alone (a `Resize` or `Stop` is never taken). `MessageBox` closes
-on any key; `Confirm` calls back with the answer to `y` or `n`. A `Modal` of your own has a `title`,
-a `measure`, a `draw` and a `handle` that answers whether it stays open.
+on any key; `Confirm` calls back with the answer to `y` or `n` (`Y`, `N`, Escape for no, or a click on
+an answer), any other key leaving it open. A `Confirm` shows its question wrapped, then `details`
+(rows of a label and a value, each value cut with `…` at the edge; a `var`, so a clock in it can
+count on while it is open), a blank row, and the answers, `y yes  n no` by default, named by `yes`
+and `no`, each key in `keyStyle`. In a box too low for all of it the answers keep the bottom row and
+the question the rows above, the blank row and then the last details giving way; in one narrower
+than the answers, their keys show alone (`y  n`). A `Modal` of your own has a `title`, a `measure`, a
+`draw` and a `handle` that answers whether it stays open.
 
 ```text
-modals.push(Confirm("kill", s"Kill job $id?", yes -> if yes then kill(id)))
+modals.push(Confirm(s"Kill job $id?", "", yes -> if yes then kill(id), details = [("command", cmd)], yes = "kill", no = "cancel"))
 if !modals.handle(e) then handleBase(e)
 modals.draw(g, g.area())
 ```

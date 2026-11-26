@@ -2,7 +2,8 @@ module tests
 
 // The modal stack: where a modal is drawn and how, which events it takes, and the two modals tui has.
 import dev.avinlang.tui.{
-  Char, Confirm, Drag, Escape, Grid, KeyPress, MessageBox, ModalStack, Mouse, MouseEvent, Press, Rect, Resize, Stop
+  Bold, Char, Confirm, Drag, Escape, Grid, KeyPress, MessageBox, ModalStack, Mouse, MouseEvent, Press, Rect, Red, Resize,
+  Stop, Style
 }
 
 @test("an empty stack takes no event and draws nothing")
@@ -88,6 +89,133 @@ modalConfirmDraws()
       "  ╰─────────────╯   ", "                    "
     ]
   )
+
+@test("a question's details are a column of labels and their values, each value cut at the edge")
+modalConfirmDetails()
+  val m = ModalStack()
+  m.push(
+    Confirm("Kill job 7?", "", a -> (), details = [("label", "nightly"), ("command", "make -j4 test-everything")])
+  )
+  val g = Grid(40, 7)
+  m.draw(g, g.area())
+  assertEq(
+    rows(g),
+    [
+      " ╭─Kill job 7?───────────────────────╮  ", " │ label    nightly                  │  ",
+      " │ command  make -j4 test-everything │  ", " │                                   │  ",
+      " │ y yes  n no                       │  ", " ╰───────────────────────────────────╯  ",
+      "                                        "
+    ]
+  )
+  assertEq(g(3, 1).style, Style.plain().with(Bold))
+  assertEq(g(12, 1).style, Style.plain())
+  val narrow = Grid(24, 7)
+  m.draw(narrow, narrow.area())
+  assertEq(narrow.rowText(1), "│ label    nightly     │")
+  assertEq(narrow.rowText(2), "│ command  make -j4 t… │")
+
+@test("a question's details changed while it is open show at the next draw, its width following them")
+modalConfirmDetailsChange()
+  val m = ModalStack()
+  val c = Confirm("t", "", a -> (), details = [("ran", "0:59")])
+  m.push(c)
+  val g = Grid(20, 5)
+  m.draw(g, g.area())
+  assertEq(g.rowText(1), "  │ ran  0:59   │   ")
+  c.details = [("ran", "1:00:00")]
+  val again = Grid(20, 5)
+  m.draw(again, again.area())
+  assertEq(again.rowText(1), "  │ ran  1:00:00 │  ")
+
+@test("a question's answers can be named, each key in its own style and each word in the box's")
+modalConfirmAnswerWords()
+  val m = ModalStack()
+  val keys = Style.fg(Red).with(Bold)
+  m.push(Confirm("Kill job 7?", "", a -> (), yes = "kill", no = "cancel", keyStyle = keys))
+  val g = Grid(20, 3)
+  m.draw(g, g.area())
+  assertEq(rows(g), ["╭─Kill job 7?──────╮", "│ y kill  n cancel │", "╰──────────────────╯"])
+  assertEq(g(2, 1).style, keys)
+  assertEq(g(4, 1).style, Style.plain())
+  assertEq(g(10, 1).style, keys)
+  assertEq(g(12, 1).style, Style.plain())
+
+@test("a question's title, question lines, details and answers each set its width, the widest winning")
+modalConfirmMeasure()
+  assertEq(Confirm("a title wider", "", a -> ()).measure(80, 20), (15, 1))
+  assertEq(Confirm("t", "", a -> (), yes = "yes, kill it").measure(80, 20), (22, 1))
+  assertEq(Confirm("t", "first\na longer second", a -> ()).measure(80, 20), (17, 4))
+  assertEq(Confirm("t", "q", a -> (), details = [("ab", "value")]).measure(80, 20), (13, 4))
+  assertEq(Confirm("t", "q", a -> (), details = [("ab", "value")]).measure(8, 2), (8, 2))
+
+@test("a box too low for a question keeps the answers, then the question, giving up the blank row and details")
+modalConfirmLow()
+  val details = [("one", "1"), ("two", "2")]
+  val m = ModalStack()
+  m.push(Confirm("t", "Sure?", a -> (), details = details))
+  // all of it: the question, two details, the blank row and the answers
+  val full = Grid(20, 7)
+  m.draw(full, full.area())
+  assertEq(
+    (1 ..< 6).map(y -> full.rowText(y).trim).toVector,
+    ["│ Sure?       │", "│ one  1      │", "│ two  2      │", "│             │", "│ y yes  n no │"]
+  )
+  // one row short: the blank row goes
+  val four = Grid(20, 6)
+  m.draw(four, four.area())
+  assertEq((1 ..< 5).map(y -> four.rowText(y).trim).toVector, ["│ Sure?       │", "│ one  1      │", "│ two  2      │", "│ y yes  n no │"])
+  // two short: the last detail goes too
+  val three = Grid(20, 5)
+  m.draw(three, three.area())
+  assertEq((1 ..< 4).map(y -> three.rowText(y).trim).toVector, ["│ Sure?       │", "│ one  1      │", "│ y yes  n no │"])
+  // one row inside: the answers alone
+  val one = Grid(20, 3)
+  m.draw(one, one.area())
+  assertEq(one.rowText(1).trim, "│ y yes  n no │")
+
+@test("a box narrower than the answers shows their keys alone, which a click still answers")
+modalConfirmNarrow()
+  val answers = Buffer[bool]()
+  val m = ModalStack()
+  m.push(Confirm("Kill job 7?", "", a -> answers.addOne(a), yes = "kill", no = "cancel"))
+  val g = Grid(12, 3)
+  m.draw(g, g.area())
+  assertEq(rows(g), ["╭─Kill jo…─╮", "│ y  n     │", "╰──────────╯"])
+  // x 3 is the blank after y's key, which has no word here
+  m.handle(Mouse(MouseEvent(Press, 0, 3, 1, 0)))
+  assertEq(m.length(), 1)
+  m.handle(Mouse(MouseEvent(Press, 0, 5, 1, 0)))
+  assertEq(answers.toVector, [false])
+  // just wide enough for them whole
+  m.push(Confirm("Kill job 7?", "", a -> (), yes = "kill", no = "cancel"))
+  val exact = Grid(20, 3)
+  m.draw(exact, exact.area())
+  assertEq(exact.rowText(1), "│ y kill  n cancel │")
+
+@test("a click on an answer's key or word answers it; a click elsewhere, or a drag, leaves the question open")
+modalConfirmClicks()
+  val answers = Buffer[bool]()
+  val m = ModalStack()
+  val g = Grid(20, 3)
+  // drawn at x 0: `│ y kill  n cancel     │`, y at 2..8, n at 10..18, on row 1
+  m.push(Confirm("Kill job 7?", "", a -> answers.addOne(a), yes = "kill", no = "cancel"))
+  m.draw(g, g.area())
+  for (x, y) in [(1, 1), (8, 1), (9, 1), (18, 1), (5, 0), (5, 2)]
+    assertEq(m.handle(Mouse(MouseEvent(Press, 0, x, y, 0))), true)
+    assert(m.length() == 1, s"$x,$y")
+  assertEq(m.handle(Mouse(MouseEvent(Drag, 0, 3, 1, 0))), true)
+  assertEq(m.length(), 1)
+  m.handle(Mouse(MouseEvent(Press, 0, 7, 1, 0)))
+  assertEq(m.isEmpty(), true)
+  for x in [10, 17]
+    m.push(Confirm("Kill job 7?", "", a -> answers.addOne(a), yes = "kill", no = "cancel"))
+    m.draw(g, g.area())
+    m.handle(Mouse(MouseEvent(Press, 0, x, 1, 0)))
+    assertEq(m.isEmpty(), true)
+  m.push(Confirm("Kill job 7?", "", a -> answers.addOne(a), yes = "kill", no = "cancel"))
+  m.draw(g, g.area())
+  m.handle(Mouse(MouseEvent(Press, 0, 2, 1, 0)))
+  assertEq(answers.toVector, [true, false, false, true])
 
 @test("a modal bigger than the screen is cut to it, its text ending with an ellipsis")
 modalTooBig()
